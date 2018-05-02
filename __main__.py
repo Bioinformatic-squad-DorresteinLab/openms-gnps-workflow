@@ -1,3 +1,15 @@
+'''
+This workflow was intended to integrate OpenMS modules with GNPS.
+
+The workflow operates as follows:
+1. FeatureFinderMetabo
+2. IDMapper
+3. MapAlignerPoseClustering
+4. MetaboliteAdductDecharge
+5. FeatureLinkerUnlabeledQT
+6. GNPSExport
+'''
+
 import os
 import sys
 
@@ -23,7 +35,7 @@ def per_file_workflow_pre(file, count):
     print("COMMAND: " + command + '\n')
     os.system(command)
 
-    # 1b IDMapper
+    # 2 IDMapper
     print('\n==IDMapper==')
     output_1b = 'idmapper'+str(count)+'.featureXML'
     command = 'IDMapper -ini ' + ini_files['idmapper_ini'] + ' -in ' + output_1 + ' -id ' + ini_files['idmapper_id'] + ' -out ' + output_1b
@@ -34,7 +46,7 @@ def per_file_workflow_pre(file, count):
 def per_file_workflow_post(file, count):
     input_path = 'mapalignerposeclustering' + str(count) + '.featureXML'
 
-    # 3 MetaboliteAdductDecharger
+    # 4 MetaboliteAdductDecharger
     print('\n==MetaboliteAdductDecharge==')
     output_3_fm = 'metaboliteadductdecharger'+str(count)+'.featureXML'
     output_3_cm = 'metaboliteadductdecharger'+str(count)+'.consensusXML'
@@ -47,11 +59,11 @@ def per_file_workflow_post(file, count):
 
 
 def main():
-    # 1 FeatureFinderMetabo
+    # 1 FeatureFinderMetabo and 2 IDMapper
     for i in range(1, len(sys.argv)):
         per_file_workflow_pre(sys.argv[i], i)
 
-    # 2 MapAlignerSpectrum (using featureXML)
+    # 3 MapAlignerSpectrum (using featureXML)
     print('\n==MapAlignerPoseClustering==')
     command = 'MapAlignerPoseClustering -ini ' + ini_files['mapaligner'] + ' -in'
     #   module inputs
@@ -65,11 +77,11 @@ def main():
     print("COMMAND: " + command + '\n')
     os.system(command)
 
-    # 3 MetaboliteAdductDecharger
+    # 4 MetaboliteAdductDecharger
     for i in range(1, len(sys.argv)):
         per_file_workflow_post(sys.argv[i], i)
 
-    # 4 FeatureLinkerUnlabeledQT
+    # 5 FeatureLinkerUnlabeledQT
     output_4 = ""
     if len(sys.argv) - 1 > 1:
         file_1s = [outputs[0]]
@@ -94,7 +106,7 @@ def main():
     else:
         output_4 = outputs[0]
 
-    # 5 GNPSExport
+    # 6 GNPSExport
     print('\n==GNPSExport==')
     output_5 = "OUT.mgf"
     input_5 = output_4
