@@ -120,6 +120,7 @@ protected:
 			featureStream << "SCANS=" << std::to_string(i+1) << endl;
 			featureStream << "RTINSECONDS=" << precisionWrapper(feature.getRT()) << endl; // round RTINSECONDS to 2 decimal points
 			featureStream << "CHARGE=" << std::to_string(charge) << endl; // CHARGE = 1 when == 0
+			// featureStream << "ADDUCT=" <<  {adduct from consensusFeature — retrieve value}
 			featureStream << "MSLEVEL=2" << endl;
 
 			// scansOutput must match original mzML spectral list

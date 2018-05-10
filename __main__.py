@@ -15,12 +15,12 @@ import sys
 
 # tmp_files = {0:'mapaligner', 1:'featurefindermetabo', 2:'metaboliteadductdecharge', 3:'in_3b.featureXML', 4:'in_4.featureXML', 5:'in_3a.featureXML', 6:'out.consensusXML'}
 outputs = []
-ini_files = {'featurefinder': "/Users/abipalli/Developer/openms/default_ini_steps/1_FeatureFinderMetabo",
-    'mapaligner': "/Users/abipalli/Developer/openms/default_ini_steps/2_MapAlignerPoseClustering",
-    'adductdecharger': "/Users/abipalli/Developer/openms/default_ini_steps/3_MetaboliteAdductDecharger",
-    'featurelinker': "/Users/abipalli/Developer/openms/default_ini_steps/4_FeatureLinkerUnlabeledQT",
-    'idmapper_ini': "/Users/abipalli/Developer/openms/default_ini_steps/1b_IDMapper",
-    'idmapper_id': "/Users/abipalli/Developer/openms/empty.idXML"}
+ini_files = {'featurefinder': "/Users/abipalli/Developer/openms_workflow/ini_steps/1_FeatureFinderMetabo",
+    'mapaligner': "/Users/abipalli/Developer/openms_workflow/ini_steps/2_MapAlignerPoseClustering",
+    'adductdecharger': "/Users/abipalli/Developer/openms_workflow/ini_steps/3_MetaboliteAdductDecharger",
+    'featurelinker': "/Users/abipalli/Developer/openms_workflow/ini_steps/4_FeatureLinkerUnlabeledQT",
+    'idmapper_ini': "/Users/abipalli/Developer/openms_workflow/ini_steps/1b_IDMapper",
+    'idmapper_id': "/Users/abipalli/Developer/openms_workflow/empty.idXML"}
 
 
 def usage():
@@ -38,7 +38,7 @@ def per_file_workflow_pre(file, count):
     # 2 IDMapper
     print('\n==IDMapper==')
     output_1b = 'idmapper'+str(count)+'.featureXML'
-    command = 'IDMapper -ini ' + ini_files['idmapper_ini'] + ' -in ' + output_1 + ' -id ' + ini_files['idmapper_id'] + ' -out ' + output_1b
+    command = 'IDMapper -ini ' + ini_files['idmapper_ini'] + ' -in ' + output_1 + ' -id ' + ini_files['idmapper_id'] + ' -spectra:in ' + file + ' -out ' + output_1b
     print("COMMAND: " + command + '\n')
     os.system(command)
 
