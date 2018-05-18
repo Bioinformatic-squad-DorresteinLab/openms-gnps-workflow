@@ -48,7 +48,7 @@ class TOPPGNPSExport : public TOPPBase
 {
 public:
 	TOPPGNPSExport() :
-		TOPPBase("GNPSExport", "Tool to export consensus features into MGF format", false) {}
+	TOPPBase("GNPSExport", "Tool to export consensus features into MGF format", false) {}
 
 protected:
 	// this function will be used to register the tool parameters
@@ -73,8 +73,8 @@ protected:
 	ExitCodes main_(int, const char **)
 	{
 		//-------------------------------------------------------------
-    // parsing parameters
-    //-------------------------------------------------------------
+		// parsing parameters
+		//-------------------------------------------------------------
 		String consensusFile(getStringOption_("in_cm"));
 		StringList mzmlFiles(getStringList_("in_mzml"));
 
@@ -82,8 +82,8 @@ protected:
 
 
 		//-------------------------------------------------------------
-    // reading input
-    //-------------------------------------------------------------
+		// reading input
+		//-------------------------------------------------------------
 		// ConsensusMap
 		ConsensusMap consensusMap;
 		ConsensusXMLFile().load(consensusFile, consensusMap);
@@ -95,16 +95,16 @@ protected:
 			MSExperiment map;
 			MzMLFile().load(mzmlFile, map);
 			msMaps.push_back(map);
- 		}
+		}
 		// MSExperiment msMap;
 		// MzMLFile().load(mzmlFile, msMap);
 
 
 		//-------------------------------------------------------------
-    // calculations
-    //-------------------------------------------------------------
+		// calculations
+		//-------------------------------------------------------------
 		std::stringstream outputStream;
-int hmAnnotations = 0;
+		int hmAnnotations = 0;
 		for(Size i = 0; i != consensusMap.size(); i ++)
 		{
 			const ConsensusFeature& feature = consensusMap[i];
@@ -175,7 +175,7 @@ hmAnnotations += peptideAnnotations.size();
 			featureStream << "SCANS=" << std::to_string(i+1) << endl;
 			featureStream << "RTINSECONDS=" << precisionWrapper(feature.getRT()) << endl; // round RTINSECONDS to 2 decimal points
 			featureStream << "CHARGE=" << std::to_string(charge) << endl; // CHARGE = 1 when == 0
-// featureStream << "ADDUCT=" <<  {adduct from consensusFeature — retrieve value}
+			// featureStream << "ADDUCT=" <<  {adduct from consensusFeature — retrieve value}
 			featureStream << "MSLEVEL=2" << endl;
 			// scansOutput must match original mzML spectral list
 			featureStream << scansOutput;
@@ -188,11 +188,11 @@ hmAnnotations += peptideAnnotations.size();
 
 
 		//-------------------------------------------------------------
-    // writing output
-    //-------------------------------------------------------------
+		// writing output
+		//-------------------------------------------------------------
 		ofstream outputFile(out);
 		outputFile.precision(writtenDigits<double>(0.0));
-outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl;
+		outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl;
 		outputFile << outputStream.str();
 		outputFile.close();
 
