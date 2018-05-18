@@ -104,7 +104,7 @@ protected:
 		// calculations
 		//-------------------------------------------------------------
 		std::stringstream outputStream;
-		int hmAnnotations = 0;
+// int hmAnnotations = 0;
 		for(Size i = 0; i != consensusMap.size(); i ++)
 		{
 			const ConsensusFeature& feature = consensusMap[i];
@@ -137,12 +137,12 @@ protected:
 
 			// print spectra information (PeptideIdentification tags)
 			vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
-hmAnnotations += peptideAnnotations.size();
+// hmAnnotations += peptideAnnotations.size();
 			if(peptideAnnotations.empty()) {
 				// skip feature if no annotation
 			}
 			else {
-				scansOutput += "IS ANNOTATED\n";
+				// scansOutput += "IS ANNOTATED\n";
 				for (auto annotation : peptideAnnotations) {
 					// append spectra information to scansOutput
 					// scansOutput += std::to_string(annotation.getMZ()) + " " + std::to_string(annotation.getRT()) + "\n";
@@ -158,7 +158,7 @@ hmAnnotations += peptideAnnotations.size();
 
 							if(ms2.getMSLevel() == 2) {
 								ms2.sortByIntensity(true);
-								ms2.
+								// ms2.
 								scansOutput += to_string(ms2.getRT()) + '\n';
 							}
 						}
