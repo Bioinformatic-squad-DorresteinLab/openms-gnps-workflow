@@ -34,6 +34,10 @@
 
 #include <OpenMS/APPLICATIONS/TOPPBase.h>
 #include <OpenMS/FORMAT/ConsensusXMLFile.h>
+#include <OpenMS/FORMAT/MzMLFile.h>
+#include <OpenMS/METADATA/PeptideIdentification.h>
+#include <OpenMS/KERNEL/MSExperiment.h>
+#include <OpenMS/KERNEL/MSSpectrum.h>
 #include <iostream>
 #include <fstream>
 
@@ -51,8 +55,15 @@ protected:
 	// it gets automatically called on tool execution
 	void registerOptionsAndFlags_()
 	{
-		registerInputFile_("in_cm", "<file>", "", "Input file containing consensus elements");
+		registerInputFile_("in_cm", "<file>", "", "input file containing consensus elements with PeptideIdentification annotation");
 		setValidFormats_("in_cm", ListUtils::create<String>("consensusXML"));
+
+		addEmptyLine_();
+
+		registerInputFileList_("in_mzml", "<files>", ListUtils::create<String>(""), "input files containing consensus elements with PeptideIdentification annotation");
+		setValidFormats_("in_mzml", ListUtils::create<String>("mzML"));
+
+		addEmptyLine_();
 
 		registerOutputFile_("out", "<file>", "", "Output MGF file");
 		// setValidFormats_("out", ListUtils::create<String>("mgf"));
@@ -64,47 +75,58 @@ protected:
 		//-------------------------------------------------------------
     // parsing parameters
     //-------------------------------------------------------------
-		String in(getStringOption_("in"));
+		String consensusFile(getStringOption_("in_cm"));
+		StringList mzmlFiles(getStringList_("in_mzml"));
+
 		String out(getStringOption_("out"));
+
 
 		//-------------------------------------------------------------
     // reading input
     //-------------------------------------------------------------
-		ConsensusMap map;
-		ConsensusXMLFile().load(in, map);
+		// ConsensusMap
+		ConsensusMap consensusMap;
+		ConsensusXMLFile().load(consensusFile, consensusMap);
+
+		// MSExperiment
+		vector<MSExperiment> msMaps;
+		for(auto mzmlFile : mzmlFiles) {
+			std::cout << "reading MzML file: " << mzmlFile << std::endl;
+			MSExperiment map;
+			MzMLFile().load(mzmlFile, map);
+			msMaps.push_back(map);
+ 		}
+		// MSExperiment msMap;
+		// MzMLFile().load(mzmlFile, msMap);
+
 
 		//-------------------------------------------------------------
     // calculations
     //-------------------------------------------------------------
-
-		// look through RT range (consensusXML) and look through mzML file (for matching RT)
-		// look through MZ range (consensusXML) and look through mzML file (for matching MZ)
-
 		std::stringstream outputStream;
-		for(Size i = 0; i != map.size(); i ++)
+int hmAnnotations = 0;
+		for(Size i = 0; i != consensusMap.size(); i ++)
 		{
-			const ConsensusFeature& feature = map[i];
+			const ConsensusFeature& feature = consensusMap[i];
+
 
 			// store "mz rt" information from each scan
 			String scansOutput = "";
 
+
 			// default elem charge
 			BaseFeature::ChargeType charge = feature.getCharge();
 
-			// iterate through each scan
-			auto mostIntensePrec = null;
+
+			// determining charge and most intense feature for header
+			auto mostIntensePrec = *(feature.begin());
 			float mostIntenseVal = 0;
+			// TODO: for each consensus feature --> print out corresponding MZ and RT for most intense ion +/-0.7da
 			for (ConsensusFeature::HandleSetType::const_iterator it = feature.begin(); it != feature.end(); ++it) {
-				// append specific scan information to scansOutput
-//				scansOutput += std::to_string(it->getMZ()) + " " + std::to_string(it->getRT()) + "\n";
 				if(it->getIntensity() > mostIntenseVal) {
 					mostIntenseVal = it->getIntensity();
 					mostIntensePrec = *it;
 				}
-
-				// export the spectrum with the highest intensity (for precursor ion)
-
-
 
 				// check if current scan charge value is largest
 				if(it->getCharge() > charge) {
@@ -112,7 +134,40 @@ protected:
 				}
 			}
 
-			// validate number of scans outputted
+
+			// print spectra information (PeptideIdentification tags)
+			vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
+hmAnnotations += peptideAnnotations.size();
+			if(peptideAnnotations.empty()) {
+				// skip feature if no annotation
+			}
+			else {
+				scansOutput += "IS ANNOTATED\n";
+				for (auto annotation : peptideAnnotations) {
+					// append spectra information to scansOutput
+					// scansOutput += std::to_string(annotation.getMZ()) + " " + std::to_string(annotation.getRT()) + "\n";
+					int spectrumIndex = -1;
+					if(annotation.metaValueExists("spectrum_index")) {
+						spectrumIndex = annotation.getMetaValue("spectrum_index");
+					}
+					if(spectrumIndex != -1) {
+						scansOutput += "mapIndex:" + to_string(spectrumIndex) + " ";
+						for(auto msMap : msMaps) {
+							auto spectrum = msMap.getSpectra();
+							auto ms2 = spectrum[spectrumIndex];
+
+							if(ms2.getMSLevel() == 2) {
+								ms2.sortByIntensity(true);
+								ms2.
+								scansOutput += to_string(ms2.getRT()) + '\n';
+							}
+						}
+					}
+				}
+			}
+
+
+			// consolidate feature information
 			std::stringstream featureStream;
 			featureStream << "BEGIN IONS" << endl;
 			featureStream << "FEATURE_ID=" << std::to_string(i+1) << endl;
@@ -120,17 +175,14 @@ protected:
 			featureStream << "SCANS=" << std::to_string(i+1) << endl;
 			featureStream << "RTINSECONDS=" << precisionWrapper(feature.getRT()) << endl; // round RTINSECONDS to 2 decimal points
 			featureStream << "CHARGE=" << std::to_string(charge) << endl; // CHARGE = 1 when == 0
-			// featureStream << "ADDUCT=" <<  {adduct from consensusFeature — retrieve value}
+// featureStream << "ADDUCT=" <<  {adduct from consensusFeature — retrieve value}
 			featureStream << "MSLEVEL=2" << endl;
-
 			// scansOutput must match original mzML spectral list
 			featureStream << scansOutput;
-
-
-
 			featureStream << "END IONS" << endl;
 
 
+			// output feature information to general outputStream
 			outputStream << featureStream.str() << endl;
 		}
 
@@ -140,6 +192,7 @@ protected:
     //-------------------------------------------------------------
 		ofstream outputFile(out);
 		outputFile.precision(writtenDigits<double>(0.0));
+outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl;
 		outputFile << outputStream.str();
 		outputFile.close();
 
