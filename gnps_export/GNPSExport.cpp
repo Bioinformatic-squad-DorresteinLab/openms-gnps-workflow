@@ -104,7 +104,7 @@ protected:
 		// calculations
 		//-------------------------------------------------------------
 		std::stringstream outputStream;
-// int hmAnnotations = 0;
+		int hmAnnotations = 0; // TEMP: annotation log
 		for(Size i = 0; i != consensusMap.size(); i ++)
 		{
 			const ConsensusFeature& feature = consensusMap[i];
@@ -137,30 +137,27 @@ protected:
 
 			// print spectra information (PeptideIdentification tags)
 			vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
-// hmAnnotations += peptideAnnotations.size();
-			if(peptideAnnotations.empty()) {
-				// skip feature if no annotation
-			}
-			else {
+			hmAnnotations += peptideAnnotations.size(); // TEMP: annotation log
+			if(!peptideAnnotations.empty()) {
 				// scansOutput += "IS ANNOTATED\n";
-				for (auto annotation : peptideAnnotations) {
+				for (auto peptideAnnotation : peptideAnnotations) {
 					// append spectra information to scansOutput
 					// scansOutput += std::to_string(annotation.getMZ()) + " " + std::to_string(annotation.getRT()) + "\n";
+					int mapIndex = -1;
 					int spectrumIndex = -1;
-					if(annotation.metaValueExists("spectrum_index")) {
-						spectrumIndex = annotation.getMetaValue("spectrum_index");
-					}
+					if(peptideAnnotation.metaValueExists("spectrum_index")) { spectrumIndex = peptideAnnotation.getMetaValue("spectrum_index"); }
+					if(peptideAnnotation.metaValueExists("map_index")) { spectrumIndex = peptideAnnotation.getMetaValue("map_index"); }
 					if(spectrumIndex != -1) {
-						scansOutput += "mapIndex:" + to_string(spectrumIndex) + " ";
-						for(auto msMap : msMaps) {
-							auto spectrum = msMap.getSpectra();
-							auto ms2 = spectrum[spectrumIndex];
+						cout << "map index " << mapIndex << "\tspectrum index " << spectrumIndex << endl;
+						// scansOutput += "mapIndex:" + to_string(spectrumIndex) + " ";
+						auto msMap = msMaps[mapIndex];
+						auto spectrum = msMap.getSpectra();
+						auto ms2 = spectrum[spectrumIndex];
 
-							if(ms2.getMSLevel() == 2) {
-								ms2.sortByIntensity(true);
-								// ms2.
-								scansOutput += to_string(ms2.getRT()) + '\n';
-							}
+						if(ms2.getMSLevel() == 2) {
+							ms2.sortByIntensity(true);
+							// ms2.
+							scansOutput += to_string(ms2.getRT()) + '\n';
 						}
 					}
 				}
@@ -192,7 +189,7 @@ protected:
 		//-------------------------------------------------------------
 		ofstream outputFile(out);
 		outputFile.precision(writtenDigits<double>(0.0));
-		outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl;
+		outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl; // TEMP: annotation log
 		outputFile << outputStream.str();
 		outputFile.close();
 

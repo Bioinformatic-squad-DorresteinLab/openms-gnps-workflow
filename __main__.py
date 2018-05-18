@@ -125,15 +125,6 @@ def main():
     os.system(command)
 
 
-
-def clean(orig_dir):
-    print('\n==CLEANING OUT TEMP FILES==')
-    for file in os.listdir('.'):
-        if file not in orig_dir:
-            print('removing ' + file + '...')
-            os.system('rm ' + file)
-
-
 if __name__ == '__main__':
     print("===RUNNING OPENMS MOCK WORKFLOW===")
     if len(sys.argv) < 2:
