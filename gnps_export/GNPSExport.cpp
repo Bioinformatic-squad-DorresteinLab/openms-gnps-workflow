@@ -72,11 +72,14 @@
 		// the main function is called after all parameters are read
 		ExitCodes main_(int, const char **)
 		{
+			ProgressLogger progressLogger;
+			progressLogger.setLogType(log_type_);
+
 			//-------------------------------------------------------------
 			// parsing parameters
 			//-------------------------------------------------------------
-			String consensusFile(getStringOption_("in_cm"));
-			StringList mzmlFiles(getStringList_("in_mzml"));
+			String consensusFilePath(getStringOption_("in_cm"));
+			StringList mzmlFilePaths(getStringList_("in_mzml"));
 
 			String out(getStringOption_("out"));
 
@@ -85,38 +88,38 @@
 			// reading input
 			//-------------------------------------------------------------
 			// ConsensusMap
+			ConsensusXMLFile consensusFile;
+			consensusFile.setLogType(log_type_);
 			ConsensusMap consensusMap;
-			ConsensusXMLFile().load(consensusFile, consensusMap);
+			consensusFile.load(consensusFilePath, consensusMap);
 
 			// MSExperiment
 			vector<MSExperiment> msMaps;
-			for(auto mzmlFile : mzmlFiles) {
-				std::cout << "reading MzML file: " << mzmlFile << std::endl;
+			for(auto mzmlFilePath : mzmlFilePaths) {
+				MzMLFile mzmlFile;
+				mzmlFile.setLogType(log_type_);
 				MSExperiment map;
-				MzMLFile().load(mzmlFile, map);
+				mzmlFile.load(mzmlFilePath, map);
 				msMaps.push_back(map);
 			}
-			// MSExperiment msMap;
-			// MzMLFile().load(mzmlFile, msMap);
 
 
 			//-------------------------------------------------------------
 			// calculations
 			//-------------------------------------------------------------
+			progressLogger.startProgress(0, consensusMap.size(), "parsing consensusXML file for ms2 scans");
 			std::stringstream outputStream;
 			int hmAnnotations = 0; // TEMP: annotation log
 			for(Size i = 0; i != consensusMap.size(); i ++)
 			{
+				progressLogger.setProgress(i);
 				const ConsensusFeature& feature = consensusMap[i];
-
 
 				// store "mz rt" information from each scan
 				String scansOutput = "";
 
-
 				// default elem charge
 				BaseFeature::ChargeType charge = feature.getCharge();
-
 
 				// determining charge and most intense feature for header
 				auto mostIntensePrec = *(feature.begin());
@@ -134,38 +137,46 @@
 					}
 				}
 
-
 				// print spectra information (PeptideIdentification tags)
 				vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
 				hmAnnotations += peptideAnnotations.size(); // TEMP: annotation log
-				if(!peptideAnnotations.empty()) {
-					// scansOutput += "IS ANNOTATED\n";
+				bool shouldSkipFeature = peptideAnnotations.empty();
+				if(!shouldSkipFeature) {
 					for (auto peptideAnnotation : peptideAnnotations) {
 						// append spectra information to scansOutput
-						// scansOutput += std::to_string(annotation.getMZ()) + " " + std::to_string(annotation.getRT()) + "\n";
-						int mapIndex = -1;
-						int spectrumIndex = -1;
+						int mapIndex = -1, spectrumIndex = -1;
 						if(peptideAnnotation.metaValueExists("spectrum_index")) {
 							spectrumIndex = peptideAnnotation.getMetaValue("spectrum_index");
 						}
 						if(peptideAnnotation.metaValueExists("map_index")) {
-							spectrumIndex = peptideAnnotation.getMetaValue("map_index");
+							mapIndex = peptideAnnotation.getMetaValue("map_index");
 						}
-						if(spectrumIndex != -1 & mapIndex != -1) {
-							cout << "map index " << mapIndex << "\tspectrum index " << spectrumIndex << endl;
+
+						if(spectrumIndex != -1 && mapIndex != -1) {
+							LOG_DEBUG << "map index\t" << mapIndex << "\tspectrum index\t" << spectrumIndex << endl;
 							// scansOutput += "mapIndex:" + to_string(spectrumIndex) + " ";
 							auto msMap = msMaps[mapIndex];
 							auto spectrum = msMap.getSpectra();
-							auto ms2 = spectrum[spectrumIndex];
+							auto ms2Scan = spectrum[spectrumIndex];
 
-							if(ms2.getMSLevel() == 2) {
-								ms2.sortByIntensity(true);
-								// ms2.
-								scansOutput += to_string(ms2.getRT()) + '\n';
+							scansOutput += "map index\t" + to_string(mapIndex) + "\tspectrum index\t" + to_string(spectrumIndex) + "\t"; // TEMP: indeces log
+
+							if(ms2Scan.getMSLevel() == 2) {
+								shouldSkipFeature = false;
+								
+								ms2Scan.sortByIntensity(true);
+								if(ms2Scan.size() > 0) {
+									scansOutput += to_string(ms2Scan[0].getMZ()) + ' ' + to_string(ms2Scan.getRT()) + '\n';
+								} else {
+									scansOutput += "ERROR: Could not parse back to ms2 scan.\n";
+								}
+							} else {
+								scansOutput += "ERROR: Annotation is not an ms2 scan.\n";
 							}
-						}
+						} else { shouldSkipFeature = true; }
 					}
 				}
+
 
 
 				// consolidate feature information
@@ -182,18 +193,17 @@
 				featureStream << scansOutput;
 				featureStream << "END IONS" << endl;
 
-
 				// output feature information to general outputStream
 				outputStream << featureStream.str() << endl;
 			}
-
+			progressLogger.endProgress();
 
 			//-------------------------------------------------------------
 			// writing output
 			//-------------------------------------------------------------
 			ofstream outputFile(out);
 			outputFile.precision(writtenDigits<double>(0.0));
-			outputFile << "TOTAL_ANNOTATIONS_FOUND: " + std::to_string(hmAnnotations) << endl; // TEMP: annotation log
+			outputFile << "TOTAL_ANNOTATIONS_FOUND:\t" + std::to_string(hmAnnotations) << endl; // TEMP: annotation log
 			outputFile << outputStream.str();
 			outputFile.close();
 
