@@ -13,20 +13,21 @@ The workflow operates as follows:
 import os
 import sys
 
-# tmp_files = {0:'mapaligner', 1:'featurefindermetabo', 2:'metaboliteadductdecharge', 3:'in_3b.featureXML', 4:'in_4.featureXML', 5:'in_3a.featureXML', 6:'out.consensusXML'}
-# outputs = []
+
+input_files = []
+
 ini_files = {
-    'featurefinder': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1_FeatureFinderMetabo",
-    'mapaligner': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/2_MapAlignerPoseClustering",
-    'adductdecharger': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/3_MetaboliteAdductDecharger",
-    'featurelinker': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/4_FeatureLinkerUnlabeledQT",
-    'idmapper_ini': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1b_IDMapper",
-    'idmapper_id': "/Users/abipalli/Developer/openms+gnps_workflow/empty.idXML"
-    }
+'featurefinder': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1_FeatureFinderMetabo",
+'mapaligner': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/2_MapAlignerPoseClustering",
+'adductdecharger': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/3_MetaboliteAdductDecharger",
+'featurelinker': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/4_FeatureLinkerUnlabeledQT",
+'idmapper_ini': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1b_IDMapper",
+'idmapper_id': "/Users/abipalli/Developer/openms+gnps_workflow/empty.idXML"
+}
 
 
 def usage():
-    print('usage: python __main__.py <input.mzML ...>')
+    print('usage: python __main__.py <dir>')
 
 
 def per_file_workflow_post(file, count):
@@ -46,8 +47,8 @@ def per_file_workflow_post(file, count):
 
 def main():
     # 1 FeatureFinderMetabo & 2 IDMapper
-    for i in range(1, len(sys.argv)):
-        file = sys.argv[i]
+    for i in range(1, len(input_files)):
+        file = input_files[i]
         count = i
 
         # 1 FeatureFinderMetabo
@@ -76,10 +77,10 @@ def main():
     output_3 = ""
     # setup branching arrays for files
     file_1s = ["idmapper1.consensusXML"]; file_2s = []
-    for i in range(2, len(sys.argv)):
+    for i in range(2, len(input_files)):
         file_2s.append("idmapper" + str(i) + ".consensusXML")
     # run FeatureLinkerUnlabeledQT
-    if len(sys.argv) - 1 > 1:
+    if len(input_files) - 1 > 1:
         for i in range(0, len(file_2s)):
             print('\n==FeatureLinkerUnlabeledQT==')
 
@@ -121,12 +122,15 @@ def main():
     # 6 GNPSExport
     print('\n==GNPSExport==')
     input_6_cm = output_5_cm
-    input_mzml = sys.argv[1:]
+    # input_6_cm = output_3 # skip decharger step
+    input_mzml = input_files[1:]
     output_6 = "OUT.mgf"
     command = "GNPSExport -in_cm " + input_6_cm + " -in_mzml "
     for mzml_file in input_mzml:
         command += mzml_file + " "
     command += "-out " + output_6
+    # uncondensed
+    command += " -condensed 0"
     print("COMMAND: " + command + '\n')
     os.system(command)
 
@@ -135,10 +139,20 @@ if __name__ == '__main__':
     print("===RUNNING OPENMS MOCK WORKFLOW===")
 
     # usage check
-    if len(sys.argv) < 2:
+    if len(sys.argv) is not 2:
         print('Invalid num of arguments')
         usage()
         exit()
+
+    # input files
+    if sys.argv[1][-1] is not '/':
+        sys.argv[1] += '/'
+
+    input_files.append(sys.argv[0])
+    # input_files.append(sys.argv[1])
+    for root, dirs, files in os.walk(sys.argv[1]):
+        for file in files:
+            input_files.append(sys.argv[1] + file)
 
     # run workflow
     main()
@@ -147,6 +161,4 @@ if __name__ == '__main__':
     # os.system("find ./ -type f -not -name 'OUT.mgf' -delete")
 
     os.system("mkdir inp")
-    for i in range(1, len(sys.argv)):
-        print(sys.argv[i])
-        os.system("cp " + sys.argv[i] + " inp/")
+    os.system("cp " + sys.argv[1] + "* inp/")
