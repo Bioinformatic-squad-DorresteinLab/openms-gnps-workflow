@@ -31,21 +31,6 @@ def usage():
     print('usage: python __main__.py <dir>')
 
 
-def per_file_workflow_post(file, count):
-    input_path = 'mapalignerposeclustering' + str(count) + '.featureXML'
-
-    # 4 MetaboliteAdductDecharger
-    print('\n==MetaboliteAdductDecharge==')
-    output_3_fm = 'metaboliteadductdecharger'+str(count)+'.featureXML'
-    output_3_cm = 'metaboliteadductdecharger'+str(count)+'.consensusXML'
-    command = 'MetaboliteAdductDecharger -ini ' + ini_files['adductdecharger'] + ' -in ' + input_path + ' -out_cm ' + output_3_cm + ' -out_fm ' + output_3_fm
-    print("COMMAND: " + command + '\n')
-    os.system(command)
-    # outputs[file] = [output_3_fm,output_3_cm]
-    # outputs[file] = [output_3_cm]
-    # outputs.append(output_3_cm)
-
-
 def main():
     # 1 FeatureFinderMetabo + IDMapper + FileConverter
     for i in range(1, len(input_files)):
@@ -129,7 +114,7 @@ def main():
     os.system(command)
 
 
-    # 5 MetaboliteAdductDecharger
+    # 4 MetaboliteAdductDecharger
     input_5 = output_4
     print('\n==MetaboliteAdductDecharge==')
     output_5_fm = "metaboliteadductdecharger.featureXML"
@@ -139,7 +124,7 @@ def main():
     os.system(command)
 
 
-    # 6 GNPSExport
+    # 5 GNPSExport
     print('\n==GNPSExport==')
     input_6_cm = output_5_cm
     output_6 = "OUT.mgf"
