@@ -44,12 +44,14 @@ def main():
         print("COMMAND: " + command + '\n')
         os.system(command)
 
+
         # 1a IDMapper
         print('\n==IDMapper==')
         output_1a = 'idmapper'+str(count)+'.featureXML'
         command = 'IDMapper -ini ' + ini_files['idmapper_ini'] + ' -in ' + output_1 + ' -id ' + ini_files['idmapper_id'] + ' -spectra:in ' + file + ' -out ' + output_1a
         print("COMMAND: " + command + '\n')
         os.system(command)
+
 
         # Do not need FileConverter if featureXML is going to be fed into
         # MapAlignerPoseClustering...
