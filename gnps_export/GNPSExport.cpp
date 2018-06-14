@@ -139,9 +139,9 @@ protected:
 			vector<pair<pair<int,int>, double>> spectrumIntensities;
 			int mapIndex = -1, spectrumIndex = -1;
 
-			bool shouldSkipFeature = peptideAnnotations.empty();
-			if(!shouldSkipFeature) {
-				for (Size peptideIndex = 0; peptideIndex < peptideAnnotations.size(); peptideIndex++) {
+			bool shouldSkipFeature;
+			if(!(shouldSkipFeature = peptideAnnotations.empty())) {
+				for(Size peptideIndex = 0; peptideIndex < peptideAnnotations.size(); peptideIndex++) {
 					auto peptideAnnotation = peptideAnnotations[peptideIndex];
 
 					// append spectra information to scansOutput
@@ -169,54 +169,38 @@ protected:
 							currSpectrumIntensity.first = make_pair(mapIndex, spectrumIndex);
 							currSpectrumIntensity.second = ms2Scan[0].getIntensity();
 							spectrumIntensities.push_back(currSpectrumIntensity);
-
-							// if(condensed) {
-							// 	scansOutput << to_string(ms2Scan[0].getMZ()) << "\t" << ms2Scan[0].getIntensity() << endl;
-							// } else {
-							// 	for(Size l = 0; l < ms2Scan.size(); l++) {
-							// 		scansOutput << to_string(ms2Scan[l].getMZ()) << "\t" << ms2Scan[l].getIntensity() << endl;
-							// 	}
-							// }
 						}
 					} else { shouldSkipFeature = true; }
 				}
 			}
 
 			if(!shouldSkipFeature && !spectrumIntensities.empty()) {
-				// prepare spectrumIntensities for output
+				// prepare spectrumIntensities for output with highest intensity at top
 				sort(spectrumIntensities.begin(), spectrumIntensities.end(), [](const pair<pair<int,int>, double> &a, const pair<pair<int,int>, double> &b) {
 					return (a.second > b.second);
 				});
 
 				// consolidate feature+spectra annotation
-				std::stringstream featureStream;
+				stringstream featureStream;
 
-				featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
-				featureStream << "FILENAME=";
-				set<string> filenames;
-				for(auto spectrum : spectrumIntensities) {
-					filenames.insert(mzmlFilePaths[spectrum.first.first]);
-				}
-				for(string filename : filenames) {
-					featureStream << filename << " ";
-				}
-				featureStream << endl;
-				featureStream << "SCANS=" << (i+1) << endl;
-				featureStream << "MSLEVEL=2" << endl;
-				featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+				if(condensed) {
+					featureStream << "BEGIN IONS" << endl;
+					featureStream << "FEATURE_ID=" << to_string(i+1) << endl; // TODO: fix linear feature ids
 
-				if(spectrumIntensities.empty()) {
-					LOG_DEBUG << "FEATURE_ID=" << to_string(i+1) << endl;
-					LOG_DEBUG << "SPECTRUMINTENSITIES SIZE=" << spectrumIntensities.size() << endl;
-				}
-				else if(condensed) {
-					auto mostIntenseScanMetadata = spectrumIntensities[0].first;
-					auto mostIntenseScan = msMaps[mostIntenseScanMetadata.first].getSpectra()[mostIntenseScanMetadata.second];
+					featureStream << "FILENAME=";
+					set<string> filenames;
+					for(auto spectrum : spectrumIntensities) { filenames.insert(mzmlFilePaths[spectrum.first.first]); }
+					for(string filename : filenames) { featureStream << filename << " "; }
+
+					featureStream << "SCANS=" << (i+1) << endl;
+					featureStream << "MSLEVEL=2" << endl;
+					featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+
+					auto mostIntenseScan = msMaps[spectrumIntensities[0].first.first].getSpectra()[spectrumIntensities[0].first.second];
 
 					featureStream << "PEPMASS=" << mostIntenseScan.getPrecursors()[0].getMZ() << endl;
-					featureStream << "FILE_INDEX=" << mostIntenseScanMetadata.second << endl;
+					featureStream << "FILE_INDEX=" << spectrumIntensities[0].first.second << endl;
 					featureStream << "RTINSECONDS=" << mostIntenseScan.getRT() << endl; // round RTINSECONDS to 2 decimal points
-					featureStream << "BEGIN IONS" << endl;
 
 					for(auto spectrum : spectrumIntensities) {
 						auto ms2Scan = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
@@ -224,24 +208,27 @@ protected:
 
 						featureStream << to_string(ms2Scan[0].getMZ()) << "\t" << ms2Scan[0].getIntensity() << endl;
 					}
-
-					// featureStream << scansOutput.str();
-					featureStream << "END IONS" << endl;
+					featureStream << "END IONS" << endl << endl;
 				} else {
 					for(auto spectrum : spectrumIntensities) {
+						featureStream << "BEGIN IONS" << endl;
+						featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
+						featureStream << "FILENAME=" << mzmlFilePaths[spectrum.first.first] << endl;
+						featureStream << "SCANS=" << (i+1) << endl;
+						featureStream << "MSLEVEL=2" << endl;
+						featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+
 						auto ms2Scan = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
 						ms2Scan.sortByIntensity(true);
 
-						featureStream << endl;
 						featureStream << "PEPMASS=" << ms2Scan.getPrecursors()[0].getMZ() << endl;
 						featureStream << "FILE_INDEX=" << spectrum.first.second << endl;
 						featureStream << "RTINSECONDS=" << ms2Scan.getRT() << endl; // round RTINSECONDS to 2 decimal points
-						featureStream << "BEGIN IONS";
+
 						for(Size l = 0; l < ms2Scan.size(); l++) {
 							featureStream << to_string(ms2Scan[l].getMZ()) << "\t" << ms2Scan[l].getIntensity() << endl;
 						}
-						featureStream << "END IONS" << endl;
-						featureStream << endl;						
+						featureStream << "END IONS" << endl << endl;
 					}
 				}
 

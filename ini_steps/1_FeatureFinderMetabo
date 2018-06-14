@@ -14,7 +14,7 @@
       <ITEM name="test" value="false" type="string" description="Enables the test mode (needed for internal use only)" required="false" advanced="true" restrictions="true,false" />
       <NODE name="algorithm" description="Algorithm parameters section">
         <NODE name="common" description="Common parameters for all other subsections">
-          <ITEM name="noise_threshold_int" value="10" type="double" description="Intensity threshold below which peaks are regarded as noise." required="false" advanced="false" />
+          <ITEM name="noise_threshold_int" value="10000" type="double" description="Intensity threshold below which peaks are regarded as noise." required="false" advanced="false" />
           <ITEM name="chrom_peak_snr" value="3" type="double" description="Minimum signal-to-noise a mass trace should have." required="false" advanced="false" />
           <ITEM name="chrom_fwhm" value="5" type="double" description="Expected chromatographic peak width (in seconds)." required="false" advanced="false" />
         </NODE>
@@ -45,7 +45,7 @@
           <ITEM name="isotope_filtering_model" value="metabolites (5% RMS)" type="string" description="Remove/score candidate assemblies based on isotope intensities. SVM isotope models for metabolites were trained with either 2% or 5% RMS error. For peptides, an averagine cosine scoring is used. Select the appropriate noise model according to the quality of measurement or MS device." required="false" advanced="false" restrictions="metabolites (2% RMS),metabolites (5% RMS),peptides,none" />
           <ITEM name="mz_scoring_13C" value="false" type="string" description="Use the 13C isotope peak position (~1.003355 Da) as the expected shift in m/z for isotope mass traces (highly recommended for lipidomics!). Disable for general metabolites (as described in Kenar et al. 2014, MCP.)." required="false" advanced="false" restrictions="false,true" />
           <ITEM name="use_smoothed_intensities" value="true" type="string" description="Use LOWESS intensities instead of raw intensities." required="false" advanced="true" restrictions="false,true" />
-          <ITEM name="report_convex_hulls" value="false" type="string" description="Augment each reported feature with the convex hull of the underlying mass traces (increases featureXML file size considerably)." required="false" advanced="false" restrictions="false,true" />
+          <ITEM name="report_convex_hulls" value="true" type="string" description="Augment each reported feature with the convex hull of the underlying mass traces (increases featureXML file size considerably)." required="false" advanced="false" restrictions="false,true" />
         </NODE>
       </NODE>
     </NODE>
