@@ -34,6 +34,7 @@
 
 #include <OpenMS/APPLICATIONS/TOPPBase.h>
 #include <OpenMS/CONCEPT/UniqueIdInterface.h>
+#include <OpenMS/FILTERING/TRANSFORMERS/SpectraMerger.h>
 #include <OpenMS/FORMAT/ConsensusXMLFile.h>
 #include <OpenMS/FORMAT/MzMLFile.h>
 #include <OpenMS/METADATA/PeptideIdentification.h>
@@ -56,18 +57,20 @@ protected:
 	// it gets automatically called on tool execution
 	void registerOptionsAndFlags_()
 	{
-		registerInputFile_("in_cm", "<file>", "", "input file containing consensus elements with PeptideIdentification annotation");
+		registerInputFile_("in_cm", "<file>", "", "input file containing consensus elements with \'peptide\' annotations");
 		setValidFormats_("in_cm", ListUtils::create<String>("consensusXML"));
 
-		registerInputFileList_("in_mzml", "<files>", ListUtils::create<String>(""), "input files containing consensus elements with PeptideIdentification annotation");
+		registerInputFileList_("in_mzml", "<files>", ListUtils::create<String>(""), "original mzml files containing ms/ms spectrum information");
 		setValidFormats_("in_mzml", ListUtils::create<String>("mzML"));
 
 		registerOutputFile_("out", "<file>", "", "Output MGF file");
+		setValidFormats_("out", ListUtils::create<String>("mgf"));
 
-		addEmptyLine_();
+		registerStringOption_("output_type", "<choice>", "most_intense", "specificity of mgf output information", false);
+		setValidStrings_("output_type", ListUtils::create<String>("most_intense,full_spectra,merged_spectra"));
 
-		registerStringOption_("condensed", "<choice>", "1", "Only output the most intense ion per feature", false);
-		setValidStrings_("condensed", ListUtils::create<String>("0,1"));
+
+
 		// setValidFormats_("out", ListUtils::create<String>("mgf"));
 	}
 
@@ -85,7 +88,7 @@ protected:
 
 		String out(getStringOption_("out"));
 
-		bool condensed = (getStringOption_("condensed") == "1");
+		String output_type = getStringOption_("output_type");
 
 
 		//-------------------------------------------------------------
@@ -113,8 +116,7 @@ protected:
 		//-------------------------------------------------------------
 		progressLogger.startProgress(0, consensusMap.size(), "parsing consensusXML file for ms2 scans");
 		std::stringstream outputStream;
-		for(Size i = 0; i != consensusMap.size(); i ++)
-		{
+		for(Size i = 0; i != consensusMap.size(); i ++) {
 			progressLogger.setProgress(i);
 			// current feature
 			const ConsensusFeature& feature = consensusMap[i];
@@ -136,11 +138,13 @@ protected:
 			// print spectra information (PeptideIdentification tags)
 			vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
 
+			// vector of <<map index, spectrum index>, most intense ms2 scan>
 			vector<pair<pair<int,int>, double>> spectrumIntensities;
+
 			int mapIndex = -1, spectrumIndex = -1;
 
 			bool shouldSkipFeature;
-			if(!(shouldSkipFeature = peptideAnnotations.empty())) {
+			if(!(shouldSkipFeature =                                                                                                       peptideAnnotations.empty())) {
 				for(Size peptideIndex = 0; peptideIndex < peptideAnnotations.size(); peptideIndex++) {
 					auto peptideAnnotation = peptideAnnotations[peptideIndex];
 
@@ -157,8 +161,7 @@ protected:
 						LOG_DEBUG << "map index\t" << mapIndex << "\tspectrum index\t" << spectrumIndex << endl;
 
 						// retrieve spectrum for current peptide annotation
-						auto msMap = msMaps[mapIndex];
-						auto ms2Scan = msMap.getSpectra()[spectrumIndex];
+						auto ms2Scan = msMaps[mapIndex].getSpectra()[spectrumIndex];
 						ms2Scan.sortByIntensity(true);
 
 						if(ms2Scan.getMSLevel() == 2 && !ms2Scan.empty()) {
@@ -183,15 +186,14 @@ protected:
 				// consolidate feature+spectra annotation
 				stringstream featureStream;
 
-				if(condensed) {
+				if(output_type == "most_intense") {
 					featureStream << "BEGIN IONS" << endl;
 					featureStream << "FEATURE_ID=" << to_string(i+1) << endl; // TODO: fix linear feature ids
-
 					featureStream << "FILENAME=";
 					set<string> filenames;
 					for(auto spectrum : spectrumIntensities) { filenames.insert(mzmlFilePaths[spectrum.first.first]); }
 					for(string filename : filenames) { featureStream << filename << " "; }
-
+					featureStream << endl;
 					featureStream << "SCANS=" << (i+1) << endl;
 					featureStream << "MSLEVEL=2" << endl;
 					featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
@@ -203,13 +205,13 @@ protected:
 					featureStream << "RTINSECONDS=" << mostIntenseScan.getRT() << endl; // round RTINSECONDS to 2 decimal points
 
 					for(auto spectrum : spectrumIntensities) {
-						auto ms2Scan = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
-						ms2Scan.sortByIntensity(true);
+						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
+						ms2Scans.sortByIntensity(true);
 
-						featureStream << to_string(ms2Scan[0].getMZ()) << "\t" << ms2Scan[0].getIntensity() << endl;
+						featureStream << to_string(ms2Scans[0].getMZ()) << "\t" << ms2Scans[0].getIntensity() << endl;
 					}
 					featureStream << "END IONS" << endl << endl;
-				} else {
+				} else if(output_type == "full_spectra") {
 					for(auto spectrum : spectrumIntensities) {
 						featureStream << "BEGIN IONS" << endl;
 						featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
@@ -218,18 +220,50 @@ protected:
 						featureStream << "MSLEVEL=2" << endl;
 						featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
 
-						auto ms2Scan = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
-						ms2Scan.sortByIntensity(true);
+						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
+						ms2Scans.sortByIntensity(true);
 
-						featureStream << "PEPMASS=" << ms2Scan.getPrecursors()[0].getMZ() << endl;
+						featureStream << "PEPMASS=" << ms2Scans.getPrecursors()[0].getMZ() << endl;
 						featureStream << "FILE_INDEX=" << spectrum.first.second << endl;
-						featureStream << "RTINSECONDS=" << ms2Scan.getRT() << endl; // round RTINSECONDS to 2 decimal points
+						featureStream << "RTINSECONDS=" << ms2Scans.getRT() << endl; // round RTINSECONDS to 2 decimal points
 
-						for(Size l = 0; l < ms2Scan.size(); l++) {
-							featureStream << to_string(ms2Scan[l].getMZ()) << "\t" << ms2Scan[l].getIntensity() << endl;
+						for(Size l = 0; l < ms2Scans.size(); l++) {
+							featureStream << to_string(ms2Scans[l].getMZ()) << "\t" << ms2Scans[l].getIntensity() << endl;
 						}
 						featureStream << "END IONS" << endl << endl;
 					}
+				} else { // merged_spectra
+					vector<pair<double, double>> outputList;
+					for(auto spectrum : spectrumIntensities) {
+						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
+						ms2Scans.sortByIntensity(true);
+
+						for(auto ms2Scan : ms2Scans) {
+							for (auto outputListIter = outputList.begin(); outputListIter != outputList.end(); outputListIter++) {
+								if(outputListIter->second < ms2Scan.getIntensity()) {
+									outputList.insert(outputListIter, pair<double,double>(ms2Scan.getMZ(), ms2Scan.getIntensity()));
+									break;
+								}
+							}
+						}
+					}
+
+					featureStream << "BEGIN IONS" << endl;
+					featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
+					featureStream << "FILENAME=";
+					set<string> filenames;
+					for(auto spectrum : spectrumIntensities) { filenames.insert(mzmlFilePaths[spectrum.first.first]); }
+					for(string filename : filenames) { featureStream << filename << " "; }
+					featureStream << endl;
+					featureStream << "SCANS=" << (i+1) << endl;
+					featureStream << "MSLEVEL=2" << endl;
+					featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+
+					for(pair<double, double> output : outputList) {
+						featureStream << to_string(output.first) << "\t" << output.second << endl;
+					}
+
+					featureStream << "END IONS" << endl << endl;
 				}
 
 				// output feature information to general outputStream

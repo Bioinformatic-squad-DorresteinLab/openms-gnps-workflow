@@ -66,7 +66,7 @@ def main():
 
     # 2 MapAlignerPoseClustering
     print("\n==MapAlignerPoseClustering==")
-    output_2 = "poseclustering.featureXML"
+    output_2 = ""
     command = "MapAlignerPoseClustering -ini " + ini_files['mapaligner'] + ' -in '
     for i in range(1, len(input_files)):
         command += "idmapper" + str(i) + ".featureXML "
@@ -134,7 +134,7 @@ def main():
     for mzml_file in input_files[1:]:
         command += mzml_file + " "
     command += "-out " + output_6
-    command += " -condensed 1"
+    command += " -output_type merged_spectra"
     print("COMMAND: " + command + '\n')
     os.system(command)
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     print("===RUNNING OPENMS MOCK WORKFLOW===")
 
     # usage check
-    if len(sys.argv) is not 2:
+    if len(sys.argv) is not 3:
         print('Invalid num of arguments')
         usage()
         exit()
@@ -160,6 +160,8 @@ if __name__ == '__main__':
 
     # run workflow
     main()
+
+    # os.system("mv OUT.mgf " + sys.argv[2])
 
     # package folder contents
     # os.system("find ./ -type f -not -name 'OUT.mgf' -delete")
