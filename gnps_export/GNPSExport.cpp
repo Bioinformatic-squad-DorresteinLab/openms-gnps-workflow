@@ -29,10 +29,12 @@
 //
 // --------------------------------------------------------------------------
 // $Maintainer: UCSD Dorrestein Lab $
-// $Authors: Abinesh Sarvepalli, Sean Nam $
+// $Authors: Abinesh Sarvepalli $
 // --------------------------------------------------------------------------
 
 #include <OpenMS/APPLICATIONS/TOPPBase.h>
+#include <OpenMS/COMPARISON/SPECTRA/BinnedSpectrum.h>
+#include <OpenMS/COMPARISON/SPECTRA/BinnedSpectralContrastAngle.h>
 #include <OpenMS/CONCEPT/UniqueIdInterface.h>
 #include <OpenMS/FILTERING/TRANSFORMERS/SpectraMerger.h>
 #include <OpenMS/FORMAT/ConsensusXMLFile.h>
@@ -52,6 +54,11 @@ public:
 	TOPPGNPSExport() :
 	TOPPBase("GNPSExport", "Tool to export consensus features into MGF format", false) {}
 
+private:
+	double DEF_COSINE_SIMILARITY = 0.95;
+	double DEF_PRECURSOR_MZ_TOLERANCE = 0.0001;
+	double DEF_PRECURSOR_RT_TOLERANCE = 5;
+
 protected:
 	// this function will be used to register the tool parameters
 	// it gets automatically called on tool execution
@@ -66,222 +73,277 @@ protected:
 		registerOutputFile_("out", "<file>", "", "Output MGF file");
 		setValidFormats_("out", ListUtils::create<String>("mgf"));
 
-		registerStringOption_("output_type", "<choice>", "most_intense", "specificity of mgf output information", false);
-		setValidStrings_("output_type", ListUtils::create<String>("most_intense,full_spectra,merged_spectra"));
+		registerStringOption_("output_type", "<choice>", "full_spectra", "specificity of mgf output information", false);
+		setValidStrings_("output_type", ListUtils::create<String>("full_spectra,merged_spectra"));
 
+		registerDoubleOption_("precursor_mz_tolerance", "<num>", DEF_PRECURSOR_MZ_TOLERANCE, "Tolerance mz window for precursor selection", false);
+		registerDoubleOption_("precursor_rt_tolerance", "<num>", DEF_PRECURSOR_RT_TOLERANCE, "Tolerance rt window for precursor selection", false);
 
-
-		// setValidFormats_("out", ListUtils::create<String>("mgf"));
+		registerDoubleOption_("merged_spectra:cos_similarity", "<num>", DEF_COSINE_SIMILARITY, "Cosine similarity threshold for merged_spectra output", false);
 	}
 
 	// the main function is called after all parameters are read
 	ExitCodes main_(int, const char **)
 	{
-		ProgressLogger progressLogger;
-		progressLogger.setLogType(log_type_);
+		ProgressLogger progress_logger;
+		progress_logger.setLogType(log_type_);
 
 		//-------------------------------------------------------------
 		// parsing parameters
 		//-------------------------------------------------------------
-		String consensusFilePath(getStringOption_("in_cm"));
-		StringList mzmlFilePaths(getStringList_("in_mzml"));
+		String consensus_file_path(getStringOption_("in_cm"));
+		StringList mzml_file_paths(getStringList_("in_mzml"));
 
 		String out(getStringOption_("out"));
 
-		String output_type = getStringOption_("output_type");
+		String output_type(getStringOption_("output_type"));
 
+		double prec_mz_tol(getDoubleOption_("precursor_mz_tolerance"));
+		double prec_rt_tol(getDoubleOption_("precursor_rt_tolerance"));
+
+		double cos_sim(getDoubleOption_("merged_spectra:cos_similarity"));
 
 		//-------------------------------------------------------------
 		// reading input
 		//-------------------------------------------------------------
 		// ConsensusMap
-		ConsensusXMLFile consensusFile;
-		consensusFile.setLogType(log_type_);
-		ConsensusMap consensusMap;
-		consensusFile.load(consensusFilePath, consensusMap);
+		ConsensusXMLFile consensus_file;
+		consensus_file.setLogType(log_type_);
+		ConsensusMap consensus_map;
+		consensus_file.load(consensus_file_path, consensus_map);
 
 		// MSExperiment
-		vector<MSExperiment> msMaps;
-		for(auto mzmlFilePath : mzmlFilePaths) {
-			MzMLFile mzmlFile;
-			mzmlFile.setLogType(log_type_);
+		vector<MSExperiment> ms_maps;
+		for(auto mzml_file_path : mzml_file_paths) {
+			MzMLFile mzml_file;
 			MSExperiment map;
-			mzmlFile.load(mzmlFilePath, map);
-			msMaps.push_back(map);
+			mzml_file.setLogType(log_type_);
+			mzml_file.load(mzml_file_path, map);
+
+			ms_maps.push_back(map);
 		}
 
 
 		//-------------------------------------------------------------
 		// calculations
 		//-------------------------------------------------------------
-		progressLogger.startProgress(0, consensusMap.size(), "parsing consensusXML file for ms2 scans");
-		std::stringstream outputStream;
-		for(Size i = 0; i != consensusMap.size(); i ++) {
-			progressLogger.setProgress(i);
+		progress_logger.startProgress(0, consensus_map.size(), "parsing features and ms2 identifications...");
+		std::stringstream output_stream;
+		Size feature_count = 1;
+		for(Size i = 0; i != consensus_map.size(); ++i) {
+			progress_logger.setProgress(i);
 			// current feature
-			const ConsensusFeature& feature = consensusMap[i];
+			const ConsensusFeature& feature = consensus_map[i];
 
 			// store "mz rt" information from each scan
-			stringstream scansOutput;
-			scansOutput << setprecision(2) << fixed;
+			stringstream scans_output;
+			scans_output << setprecision(2) << setfill('0') << fixed;
 
-			// default elem charge
-			BaseFeature::ChargeType charge = feature.getCharge();
 			// determining charge and most intense feature for header
-			for (ConsensusFeature::HandleSetType::const_iterator featureIter = feature.begin(); featureIter != feature.end(); ++featureIter) {
-				// check if current scan charge value is largest
-				if(featureIter->getCharge() > charge) {
-					charge = featureIter->getCharge();
+			BaseFeature::ChargeType charge = feature.getCharge();
+			for (ConsensusFeature::HandleSetType::const_iterator feature_iter = feature.begin();
+			feature_iter != feature.end(); ++feature_iter) {
+				if(feature_iter->getCharge() > charge) {
+					charge = feature_iter->getCharge();
 				}
 			}
 
 			// print spectra information (PeptideIdentification tags)
-			vector<PeptideIdentification> peptideAnnotations = feature.getPeptideIdentifications();
+			vector<PeptideIdentification> peptide_identifications = feature.getPeptideIdentifications();
+
+
+			// clean peptide identifications outside mz rt tol ranges
 
 			// vector of <<map index, spectrum index>, most intense ms2 scan>
-			vector<pair<pair<int,int>, double>> spectrumIntensities;
+			vector<pair<pair<double,PeptideIdentification>,pair<int,int>>> peptides;
 
-			int mapIndex = -1, spectrumIndex = -1;
+			bool should_skip_feature;
+			if(!(should_skip_feature = peptide_identifications.empty())) {
+				for(Size peptide_index = 0; peptide_index < peptide_identifications.size(); peptide_index++) {
+					auto peptide_identification = peptide_identifications[peptide_index];
 
-			bool shouldSkipFeature;
-			if(!(shouldSkipFeature =                                                                                                       peptideAnnotations.empty())) {
-				for(Size peptideIndex = 0; peptideIndex < peptideAnnotations.size(); peptideIndex++) {
-					auto peptideAnnotation = peptideAnnotations[peptideIndex];
-
-					// append spectra information to scansOutput
-					if(peptideAnnotation.metaValueExists("spectrum_index")) {
-						spectrumIndex = peptideAnnotation.getMetaValue("spectrum_index");
+					// append spectra information to scans_output
+					int map_index = -1, spectrum_index = -1;
+					if(peptide_identification.metaValueExists("spectrum_index")) {
+						spectrum_index = peptide_identification.getMetaValue("spectrum_index");
 					}
-					if(peptideAnnotation.metaValueExists("map_index")) {
-						mapIndex = peptideAnnotation.getMetaValue("map_index");
+					if(peptide_identification.metaValueExists("map_index")) {
+						map_index = peptide_identification.getMetaValue("map_index");
 					}
 
-					if(spectrumIndex != -1 && mapIndex != -1) {
+					if(map_index != -1 && spectrum_index != -1) {
 						// TEMP: log debug map index and spectrum index values once they are found
-						LOG_DEBUG << "map index\t" << mapIndex << "\tspectrum index\t" << spectrumIndex << endl;
+						LOG_DEBUG << "map index\t" << map_index << "\tspectrum index\t" << spectrum_index << endl;
 
 						// retrieve spectrum for current peptide annotation
-						auto ms2Scan = msMaps[mapIndex].getSpectra()[spectrumIndex];
-						ms2Scan.sortByIntensity(true);
+						auto ms2_scan = ms_maps[map_index][spectrum_index];
+						ms2_scan.sortByIntensity(true);
 
-						if(ms2Scan.getMSLevel() == 2 && !ms2Scan.empty()) {
-							shouldSkipFeature = false;
+						if(ms2_scan.getMSLevel() == 2 && !ms2_scan.empty()) {
+							should_skip_feature = false;
 
-							// store current peptideIndex and highest ms2 intensity
-							pair<pair<int,int>, double> currSpectrumIntensity;
-							currSpectrumIntensity.first = make_pair(mapIndex, spectrumIndex);
-							currSpectrumIntensity.second = ms2Scan[0].getIntensity();
-							spectrumIntensities.push_back(currSpectrumIntensity);
+							// DEBUG determine if within user rt and mz tol range
+							if(abs(feature.getMZ() - peptide_identification.getMZ()) > prec_mz_tol
+							&& abs(feature.getRT() - peptide_identification.getRT()) > prec_rt_tol) {
+								continue;
+							}
+
+
+							double similarity_index = 5 * abs(feature.getMZ() - peptide_identification.getMZ()) +
+							abs(feature.getRT() - peptide_identification.getRT());
+
+							pair<double,PeptideIdentification> first_pair = pair<double,PeptideIdentification>(similarity_index, peptide_identification);
+							pair<int,int> second_pair = pair<int,int>(map_index, spectrum_index);
+
+							peptides.push_back(pair<pair<double,PeptideIdentification>,pair<int,int>>(first_pair,second_pair));
 						}
-					} else { shouldSkipFeature = true; }
+					} else { should_skip_feature = true; }
 				}
 			}
 
-			if(!shouldSkipFeature && !spectrumIntensities.empty()) {
-				// prepare spectrumIntensities for output with highest intensity at top
-				sort(spectrumIntensities.begin(), spectrumIntensities.end(), [](const pair<pair<int,int>, double> &a, const pair<pair<int,int>, double> &b) {
-					return (a.second > b.second);
+			// peptides list of < <similarity_index, PeptideIdentification>, <map_index, feature_index> >
+
+			// with the remaining peptides left within mz/rt tol of most intense
+			if(!should_skip_feature && !peptides.empty()) {
+				// prepare peptides for output with highest mz value at top
+				sort(peptides.begin(), peptides.end(), [](const pair<pair<double,PeptideIdentification>,pair<int,int>> &a, const pair<pair<double,PeptideIdentification>,pair<int,int>> &b) {
+					return a.first.first < b.first.first;
 				});
 
-				// consolidate feature+spectra annotation
-				stringstream featureStream;
+				// tmp stream for current feature
+				stringstream feature_stream;
+				feature_stream << setprecision(4) << fixed;
 
-				if(output_type == "most_intense") {
-					featureStream << "BEGIN IONS" << endl;
-					featureStream << "FEATURE_ID=" << to_string(i+1) << endl; // TODO: fix linear feature ids
-					featureStream << "FILENAME=";
-					set<string> filenames;
-					for(auto spectrum : spectrumIntensities) { filenames.insert(mzmlFilePaths[spectrum.first.first]); }
-					for(string filename : filenames) { featureStream << filename << " "; }
-					featureStream << endl;
-					featureStream << "SCANS=" << (i+1) << endl;
-					featureStream << "MSLEVEL=2" << endl;
-					featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+				if(output_type == "full_spectra") {
+					for(auto peptide : peptides) {
+						feature_stream << "BEGIN IONS" << endl;
 
-					auto mostIntenseScan = msMaps[spectrumIntensities[0].first.first].getSpectra()[spectrumIntensities[0].first.second];
+						feature_stream << "FEATURE_ID=" << to_string(feature_count) << endl;
+						feature_stream << "SCANS=" << to_string(i) << endl;
 
-					featureStream << "PEPMASS=" << mostIntenseScan.getPrecursors()[0].getMZ() << endl;
-					featureStream << "FILE_INDEX=" << spectrumIntensities[0].first.second << endl;
-					featureStream << "RTINSECONDS=" << mostIntenseScan.getRT() << endl; // round RTINSECONDS to 2 decimal points
+						feature_stream << "FILENAME=" << mzml_file_paths[peptide.second.first] << endl;
+						feature_stream << "CONSENSUSID=e_" << feature.getUniqueId() << endl;
 
-					for(auto spectrum : spectrumIntensities) {
-						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
-						ms2Scans.sortByIntensity(true);
+						feature_stream << "MSLEVEL=2" << endl;
+						feature_stream << "CHARGE=" << to_string(charge == 0 ? 1 : charge) << "+" << endl;
+						feature_stream << "PEPMASS=" << peptide.first.second.getMZ() << endl;
+						feature_stream << "FILE_INDEX=" << peptide.second.second << endl;
+						feature_stream << "RTINSECOND=" << peptide.first.second.getRT() << endl;
 
-						featureStream << to_string(ms2Scans[0].getMZ()) << "\t" << ms2Scans[0].getIntensity() << endl;
-					}
-					featureStream << "END IONS" << endl << endl;
-				} else if(output_type == "full_spectra") {
-					for(auto spectrum : spectrumIntensities) {
-						featureStream << "BEGIN IONS" << endl;
-						featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
-						featureStream << "FILENAME=" << mzmlFilePaths[spectrum.first.first] << endl;
-						featureStream << "SCANS=" << (i+1) << endl;
-						featureStream << "MSLEVEL=2" << endl;
-						featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+						auto ms2_scan = ms_maps[peptide.second.first][peptide.second.second];
+						// sort spectra
+						sort(ms2_scan.begin(), ms2_scan.end(), [](const Peak1D& a, const Peak1D& b) {
+							return a.getMZ() > b.getMZ();
+						});
+						// ms2_scan.sortByIntensity(true);
 
-						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
-						ms2Scans.sortByIntensity(true);
-
-						featureStream << "PEPMASS=" << ms2Scans.getPrecursors()[0].getMZ() << endl;
-						featureStream << "FILE_INDEX=" << spectrum.first.second << endl;
-						featureStream << "RTINSECONDS=" << ms2Scans.getRT() << endl; // round RTINSECONDS to 2 decimal points
-
-						for(Size l = 0; l < ms2Scans.size(); l++) {
-							featureStream << to_string(ms2Scans[l].getMZ()) << "\t" << ms2Scans[l].getIntensity() << endl;
+						for(Size l = 0; l < ms2_scan.size(); l++) {
+							feature_stream << ms2_scan[l].getMZ() << "\t" << to_string(ms2_scan[l].getIntensity()) << endl;
 						}
-						featureStream << "END IONS" << endl << endl;
-					}
-				} else { // merged_spectra
-					vector<pair<double, double>> outputList;
-					for(auto spectrum : spectrumIntensities) {
-						auto ms2Scans = msMaps[spectrum.first.first].getSpectra()[spectrum.first.second];
-						ms2Scans.sortByIntensity(true);
 
-						for(auto ms2Scan : ms2Scans) {
-							for (auto outputListIter = outputList.begin(); outputListIter != outputList.end(); outputListIter++) {
-								if(outputListIter->second < ms2Scan.getIntensity()) {
-									outputList.insert(outputListIter, pair<double,double>(ms2Scan.getMZ(), ms2Scan.getIntensity()));
-									break;
+						feature_stream << "END IONS" << endl << endl;
+					}
+					feature_count++;
+				}
+				// merged_spectra
+				else {
+					// map mz to intensity
+					map<double,int> ms2_block;
+
+					// MSExperiment exp;
+
+					const BinnedSpectrum binned_highest_int(ms_maps[peptides[0].second.first][peptides[0].second.second], BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES, false, 1, BinnedSpectrum::DEFAULT_BIN_OFFSET_HIRES);
+
+					for(auto peptide : peptides) {
+						int map_index = peptide.second.first;
+						int spectra_index = peptide.second.second;
+						int highest_binned_intensity = peptide.first.first;
+						auto highest_peptide_identification = peptide.first.second;
+
+						auto spectrum = ms_maps[map_index][spectra_index];
+
+						const BinnedSpectrum binned_spectrum(spectrum, BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES, false, 1, BinnedSpectrum::DEFAULT_BIN_OFFSET_HIRES);
+
+						BinnedSpectralContrastAngle bsca;
+						double cosine_sim = bsca(binned_highest_int, binned_spectrum);
+						// LOG_DEBUG << cosine_sim << " >= " << cos_sim << endl;
+
+						// compare calculated cosine sim to binned highest int
+						if(cosine_sim >= cos_sim) {
+							for(Size spectrum_index = 0; spectrum_index < spectrum.size(); ++spectrum_index) {
+								// exp.addSpectrum(spectrum);
+								// exp.addSpectrum(spectrum);
+								auto curr_spectrum = spectrum[spectrum_index];
+								if (ms2_block[curr_spectrum.getMZ()] < curr_spectrum.getIntensity()) {
+									ms2_block[curr_spectrum.getMZ()] = curr_spectrum.getIntensity();
 								}
 							}
 						}
 					}
 
-					featureStream << "BEGIN IONS" << endl;
-					featureStream << "FEATURE_ID=" << to_string(i+1) << endl;
-					featureStream << "FILENAME=";
+					// SpectraMerger merger;
+					// Param p;
+					// p.setValue("precursor_method:mz_tolerance", prec_mz_tol);
+					// p.setValue("precursor_method:rt_tolerance", prec_rt_tol*2);
+					// merger.setParameters(p);
+					// merger.mergeSpectraPrecursors(exp);
+
+					// sort(ms2_block.begin(), ms2_block.end(), [](const pair<double,int> &a, const pair<double,int> &b) {
+					// 	return a.first > b.first;
+					// });
+
+
+					feature_stream << "BEGIN IONS" << endl;
+
+					feature_stream << "FEATURE_ID=" << feature_count++ << endl;
+					feature_stream << "SCANS=" << (i+1) << endl;
+
+					feature_stream << "FILENAME=";
 					set<string> filenames;
-					for(auto spectrum : spectrumIntensities) { filenames.insert(mzmlFilePaths[spectrum.first.first]); }
-					for(string filename : filenames) { featureStream << filename << " "; }
-					featureStream << endl;
-					featureStream << "SCANS=" << (i+1) << endl;
-					featureStream << "MSLEVEL=2" << endl;
-					featureStream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
-
-					for(pair<double, double> output : outputList) {
-						featureStream << to_string(output.first) << "\t" << output.second << endl;
+					for(auto peptide : peptides) {
+						filenames.insert(mzml_file_paths[peptide.second.first]);
 					}
+					for(auto filename : filenames) {
+						feature_stream << filename << " ";
+					}
+					feature_stream << endl;
+					feature_stream << "CONSENSUSID=e_" << feature.getUniqueId() << endl;
 
-					featureStream << "END IONS" << endl << endl;
+					feature_stream << "MSLEVEL=2" << endl;
+					feature_stream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+					feature_stream << "PEPMASS=" << peptides[0].first.second.getMZ() << endl;
+					feature_stream << "FILE_INDEX=" << peptides[0].second.second << endl;
+					feature_stream << "RTINSECOND=" << peptides[0].first.second.getRT() << endl;
+
+					for(auto ms2_iter = ms2_block.rbegin(); ms2_iter != ms2_block.rend(); ++ms2_iter) {
+						feature_stream << ms2_iter->first << "\t" << ms2_iter->second << endl;
+					}
+					// for(auto exp_iter = exp.begin(); exp_iter != exp.end(); ++exp_iter) {
+					// 	auto curr_spectrum = *exp_iter;
+					// 	curr_spectrum.sortByIntensity(true);
+					// 	feature_stream << curr_spectrum[0].getMZ() << "\t" << curr_spectrum[0].getIntensity() << endl;
+					// }
+
+					feature_stream << "END IONS" << endl << endl;
 				}
 
 				// output feature information to general outputStream
-				outputStream << featureStream.str() << endl;
+				output_stream << feature_stream.str() << endl;
 			}
 		}
-		progressLogger.endProgress();
+		progress_logger.endProgress();
 
 		//-------------------------------------------------------------
 		// writing output
 		//-------------------------------------------------------------
-		ofstream outputFile(out);
-		outputFile << outputStream.str();
-		outputFile.close();
+		ofstream output_file(out);
+		progress_logger.startProgress(0, 1, "writing mgf file");
+		output_file << output_stream.str();
+		progress_logger.endProgress();
+		output_file.close();
 
 		return EXECUTION_OK;
 	}
-
 };
 
 // the actual main functioned needed to create an executable

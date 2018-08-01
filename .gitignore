@@ -1,3 +1,4 @@
-.DS_Store
-out*/*
-test*/*
+*.DS_Store
+proteomics_workflow/*
+test_*/*
+*.zip

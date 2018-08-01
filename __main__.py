@@ -17,18 +17,19 @@ import sys
 
 input_files = []
 
+ini_path = "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/"
 ini_files = {
-'featurefinder': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1_FeatureFinderMetabo",
+'featurefinder': ini_path+"1-featurefindermetabo",
 'idmapper_id': "/Users/abipalli/Developer/openms+gnps_workflow/empty.idXML",
-'idmapper_ini': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/1b_IDMapper",
-'mapaligner': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/2_MapAlignerPoseClustering",
-'featurelinker': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/3_FeatureLinkerUnlabeledKD",
-'adductdecharger': "/Users/abipalli/Developer/openms+gnps_workflow/ini_steps/4_MetaboliteAdductDecharger"
+'idmapper_ini': ini_path+"1b-idmapper",
+'mapaligner': ini_path+"2-mapalignerposeclustering",
+'featurelinker': ini_path+"3-featurelinkerunlabeledqt",
+'adductdecharger': ini_path+"4-metaboliteadductdecharger"
 }
 
 
 def usage():
-    print('usage: python __main__.py <dir>')
+    print('usage: python __main__.py <dir> <GNPS output_type>')
 
 
 def main():
@@ -109,32 +110,29 @@ def main():
 
     # 3a FileConverter
     print("\n==FileConverter==")
-    input_4 = output_3
     output_4 = "featureLinker.featureXML"
-    command = "FileConverter -in " + input_4 + " -out " + output_4
+    command = "FileConverter -in " + output_3 + " -out " + output_4
     print("COMMAND: " + command + "\n")
     os.system(command)
 
 
     # 4 MetaboliteAdductDecharger
-    input_5 = output_4
     print('\n==MetaboliteAdductDecharge==')
     output_5_fm = "metaboliteadductdecharger.featureXML"
     output_5_cm = "metaboliteadductdecharger.consensusXML"
-    command = 'MetaboliteAdductDecharger -ini ' + ini_files['adductdecharger'] + ' -in ' + input_5 + ' -out_cm ' + output_5_cm + ' -out_fm ' + output_5_fm
+    command = 'MetaboliteAdductDecharger -ini ' + ini_files['adductdecharger'] + ' -in ' + output_4 + ' -out_cm ' + output_5_cm + ' -out_fm ' + output_5_fm
     print("COMMAND: " + command + '\n')
     os.system(command)
 
 
     # 5 GNPSExport
     print('\n==GNPSExport==')
-    input_6_cm = output_5_cm
     output_6 = "OUT.mgf"
-    command = "GNPSExport -in_cm " + input_6_cm + " -in_mzml "
+    command = "GNPSExport -in_cm " + output_5_cm + " -in_mzml "
     for mzml_file in input_files[1:]:
         command += mzml_file + " "
     command += "-out " + output_6
-    command += " -output_type merged_spectra"
+    command += " -output_type " + sys.argv[2]
     print("COMMAND: " + command + '\n')
     os.system(command)
 
