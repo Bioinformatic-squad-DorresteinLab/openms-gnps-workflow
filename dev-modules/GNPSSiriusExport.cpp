@@ -158,7 +158,7 @@ protected:
     progress_logger.startProgress(0, consensus_map.size(), "parsing features and ms2 identifications...");
     std::stringstream output_stream;
     Size feature_count = 1;
-    for (Size i = 0; i != consensus_map.size(); ++i)
+    for (Size i = 0; i < consensus_map.size(); ++i)
     {
       progress_logger.setProgress(i);
       // current feature

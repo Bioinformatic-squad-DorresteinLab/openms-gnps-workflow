@@ -1,0 +1,155 @@
+<toolset>
+
+	<pathSet base="openms">
+		<toolPath tool="feature-finder-metabo" path="featurefindermetabo.py"/>
+		<toolPath tool="id-mapper" path="idmapper.py"/>
+    <pathVar  name="idmapper_empty" path="empty.idXML"/>
+    <toolPath tool="map-aligner-pose-clustering"  path="mapalignerposeclustering.py"/>
+    <toolPath tool="feature-linker-unlabeled-kd"  path="featurelinkerunlabeledkd.py"/>
+    <toolPath tool="metabolite-adduct-decharger"  path="metaboliteadductdecharger.py"/>
+    <toolPath tool="gnps-export"                  path="gnpsexport.py"/>
+    <toolPath tool="gnps-sirius-export"                  path="gnpssiriusexport.py"/>
+    <toolPath tool="text-exporter"                  path="textexporter.py"/>
+    <toolPath tool="parse-output"                  path="parse_output.py"/>
+	</pathSet>
+
+  <tool name="feature-finder-metabo">
+    <require name="inputFiles"  type="folder"/>
+    <require name="iniFiles-featurefinder"  type="file"/>
+
+    <produce name="featurefindermetabo" type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="inputFiles"/>
+      <arg valueRef="iniFiles-featurefinder"/>
+      <arg valueRef="featurefindermetabo"/>
+    </execution>
+  </tool>
+
+  <tool name="id-mapper">
+    <require name="inputFiles"  type="folder"/>
+    <require name="iniFiles-idmapper" type="file"/>
+    <require name="featurefindermetabo" type="folder"/>
+    <produce name="idmapper"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="inputFiles"/>
+      <arg valueRef="iniFiles-idmapper"/>
+      <arg valueRef="idmapper_empty"/>
+      <arg valueRef="featurefindermetabo"/>
+      <arg valueRef="idmapper"/>
+    </execution>
+  </tool>
+
+
+  <tool name="map-aligner-pose-clustering">
+    <require name="idmapper"  type="folder"/>
+    <require name="iniFiles-mapaligner" type="file"/>
+    <produce name="mapalignerposeclustering"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="idmapper"/>
+      <arg valueRef="iniFiles-mapaligner"/>
+      <arg valueRef="mapalignerposeclustering"/>
+    </execution>
+  </tool>
+
+
+  <tool name="metabolite-adduct-decharger">
+    <require name="mapalignerposeclustering" type="folder"/>
+    <require name="iniFiles-adductdecharger" type="file"/>
+    <produce name="metaboliteadductdecharger"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="mapalignerposeclustering"/>
+      <arg valueRef="iniFiles-adductdecharger"/>
+      <arg valueRef="metaboliteadductdecharger"/>
+    </execution>
+  </tool>
+
+
+  <tool name="feature-linker-unlabeled-kd">
+    <require name="metaboliteadductdecharger"  type="folder"/>
+    <require name="iniFiles-featurelinker" type="file"/>
+    <produce name="featurelinkerunlabeledkd"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="metaboliteadductdecharger"/>
+      <arg valueRef="iniFiles-featurelinker"/>
+      <arg valueRef="featurelinkerunlabeledkd"/>
+    </execution>
+  </tool>
+
+
+  <tool name="gnps-export">
+    <require name="featurelinkerunlabeledkd"  type="folder"/>
+    <require name="inputFiles"  type="folder"/>
+    <require name="iniFiles-gnpsexport" type="file"/>
+    <require name="flowParams" type="file"/>
+    <produce name="gnpsexport"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="featurelinkerunlabeledkd"/>
+      <arg valueRef="inputFiles"/>
+      <arg valueRef="iniFiles-gnpsexport"/>
+      <arg valueRef="flowParams"/>
+      <arg valueRef="gnpsexport"/>
+    </execution>
+  </tool>
+
+  <tool name="gnps-sirius-export">
+    <require name="featurelinkerunlabeledkd"  type="file"/>
+    <require name="inputFiles"  type="folder"/>
+    <require name="iniFiles-gnpsexport" type="file"/>
+    <require name="flowParams" type="file"/>
+    <produce name="gnpssiriusexport"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="featurelinkerunlabeledkd"/>
+      <arg valueRef="inputFiles"/>
+      <arg valueRef="iniFiles-gnpsexport"/>
+      <arg valueRef="flowParams"/>
+      <arg valueRef="gnpssiriusexport"/>
+    </execution>
+  </tool>
+
+  <tool name="text-exporter">
+    <require name="featurelinkerunlabeledkd"  type="folder"/>
+    <require name="iniFiles-textexporter" type="file"/>
+    <produce name="textexporter"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="featurelinkerunlabeledkd"/>
+      <arg valueRef="iniFiles-textexporter"/>
+
+      <arg valueRef="textexporter"/>
+    </execution>
+  </tool>
+
+  <tool name="parse-output">
+    <require name="featurefindermetabo" type="folder"/>
+    <require name="idmapper"  type="folder"/>
+    <require name="mapalignerposeclustering"  type="folder"/>
+    <require name="featurelinkerunlabeledkd"  type="folder"/>
+    <require name="metaboliteadductdecharger"  type="folder"/>
+    <require name="gnpsexport"  type="folder"/>
+    <require name="gnpssiriusexport"  type="folder"/>
+    <require name="textexporter"  type="folder"/>
+
+    <produce name="output"  type="folder"/>
+
+    <execution env="python" argConvention="binary">
+      <arg valueRef="featurefindermetabo"/>
+      <arg valueRef="idmapper"/>
+      <arg valueRef="mapalignerposeclustering"/>
+      <arg valueRef="featurelinkerunlabeledkd"/>
+      <arg valueRef="metaboliteadductdecharger"/>
+      <arg valueRef="gnpsexport"/>
+      <arg valueRef="gnpssiriusexport"/>
+      <arg valueRef="textexporter"/>
+
+      <arg valueRef="output"/>
+    </execution>
+  </tool>
+
+</toolset>

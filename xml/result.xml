@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<interface id="openms" version="1.2.3">
+  <download>
+    <source type="folder" name="output/"/>
+  </download>
+
+  <view id="download_all_files"  label="Download All OpenMS Output Files" group="DOWNLOADS">
+    <blockRef id="ms2_result"  type="download_ms2_result"/>
+    <blockRef id="ms1_ms2_result"  type="download_ms1_ms2_result"/>
+    <blockRef id="result_output" type="download_result_output"/>
+  </view>
+
+
+  <block id="download_ms2_result" type="dummydownload">
+    <data>
+      <source type="file" name="output/gnpsexport/gnpsexport.mgf"/>
+      <parsers>
+        <parser type="stream" contentType="text/xml"/>
+      </parsers>
+    </data>
+  </block>
+
+  <block id="download_ms1_ms2_result" type="dummydownload">
+    <data>
+      <source type="file" name="output/gnpssiriusexport/gnpssiriusexport.mgf"/>
+      <parsers>
+        <parser type="stream" contentType="text/xml"/>
+      </parsers>
+    </data>
+  </block>
+
+  <block id="download_result_output" type="dummydownload">
+    <data>
+      <source type="file" name="output/textexporter/textexporter.csv"/>
+      <parsers>
+        <parser type="stream" contentType="text/xml"/>
+      </parsers>
+    </data>
+  </block>
+
+  <block id="download_output_folder"  type="dummydownload">
+    <data>
+      <source type="folder" name="output/gnpsexport/"/>
+      <parsers>
+        <parser type="stream" contentType="text/xml"/>
+      </parsers>
+    </data>
+  </block>
+
+</interface>
