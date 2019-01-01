@@ -1,4 +1,2 @@
 *.DS_Store
-proteomics_workflow/*
-test_*/*
-*.zip
+tools-local/*
