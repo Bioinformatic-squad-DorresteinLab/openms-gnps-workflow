@@ -6,7 +6,7 @@ import xmltodict as xtd
 OUTPUT_DIR_INDEX = 9
 
 if __name__ == '__main__':
-    print("===GNPS EXPORT===")
+    print("===PARSE OUTPUT===")
 
     # set env
     # if os.environ.has_key("LD_LIBRARY_PATH"):

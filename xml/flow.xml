@@ -17,9 +17,10 @@
   <collection			name="idmapper"/>
   <collection			name="mapalignerposeclustering"/>
   <collection			name="metaboliteadductdecharger"/>
-  <collection			name="featurelinkerunlabeledkd"/>
+  <collection			name="featurelinkerunlabeled"/>
+  <collection     name="filefilter"/>
   <collection			name="gnpsexport"/>
-  <collection			name="gnpssiriusexport"/>
+  <!-- <collection			name="gnpssiriusexport"/> -->
   <collection			name="textexporter"/>
 
   <object     name="output"/>
@@ -67,34 +68,41 @@
     <output port="metaboliteadductdecharger"  collection="metaboliteadductdecharger"/>
   </action>
 
-  <action name="feature-linker-unlabeled-kd">
+  <action name="feature-linker-unlabeled">
     <input port="metaboliteadductdecharger"  collection="metaboliteadductdecharger"/>
     <input port="iniFiles-featurelinker" object="iniFiles-featurelinker"/>
+    <input port="flowParams"  object="workflowParameters"/>
 
-    <output port="featurelinkerunlabeledkd" collection="featurelinkerunlabeledkd"/>
+    <output port="featurelinkerunlabeled" collection="featurelinkerunlabeled"/>
+  </action>
+
+  <action name="file-filter">
+    <input port="featurelinkerunlabeled"  collection="featurelinkerunlabeled"/>
+
+    <output port="filefilter" collection="filefilter"/>
   </action>
 
   <action name="gnps-export">
-    <input port="featurelinkerunlabeledkd" collection="featurelinkerunlabeledkd"/>
+    <input port="filefilter" collection="filefilter"/>
     <input port="inputFiles" collection="inputFiles"/>
     <input port="iniFiles-gnpsexport" object="iniFiles-gnpsexport"/>
-    <input port="flowParams"  object="workflowParameters"/>
+    <!-- <input port="flowParams"  object="workflowParameters"/> -->
 
     <output port="gnpsexport" collection="gnpsexport"/>
   </action>
 
-  <action name="gnps-sirius-export">
+  <!-- <action name="gnps-sirius-export">
     <input port="featurelinkerunlabeledkd" collection="featurelinkerunlabeledkd"/>
     <input port="iniFiles-gnpsexport" object="iniFiles-gnpsexport"/>
     <input port="inputFiles" collection="inputFiles"/>
     <input port="flowParams"  object="workflowParameters"/>
 
     <output port="gnpssiriusexport" collection="gnpssiriusexport"/>
-  </action>
+  </action> -->
 
   <action name="text-exporter">
+    <input port="filefilter" collection="filefilter"/>
     <input port="iniFiles-textexporter" object="iniFiles-textexporter"/>
-    <input port="featurelinkerunlabeledkd" collection="featurelinkerunlabeledkd"/>
 
     <output port="textexporter" collection="textexporter"/>
   </action>
@@ -103,10 +111,10 @@
     <input port="featurefindermetabo" collection="featurefindermetabo"/>
     <input port="idmapper" collection="idmapper"/>
     <input port="mapalignerposeclustering" collection="mapalignerposeclustering"/>
-    <input port="featurelinkerunlabeledkd" collection="featurelinkerunlabeledkd"/>
     <input port="metaboliteadductdecharger"  collection="metaboliteadductdecharger"/>
+    <input port="featurelinkerunlabeled" collection="featurelinkerunlabeled"/>
+    <input port="filefilter"  collection="filefilter"/>
     <input port="gnpsexport" collection="gnpsexport"/>
-    <input port="gnpssiriusexport"  collection="gnpssiriusexport"/>
     <input port="textexporter"   collection="textexporter"/>
 
     <output port="output" object="output"/>

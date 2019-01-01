@@ -1,55 +1,63 @@
 import os
 import shutil
 import sys
+from subprocess import Popen
+
+
+def parse_folder(dir):
+    if not os.path.exists(dir):
+        yield None
+    for file in sorted(os.listdir(dir)):
+        if "log" not in file:
+            yield (dir+"/"+file, os.path.splitext(file)[0].split('-')[1])
+
+
+def get_exec_cmd(input_file, file_count, ini_file, idxml_path, input_port, out_port):
+    command = 'IDMapper '
+    if ini_file is not None:
+        command += '-ini ' + ini_file + ' '
+    command += '-in ' + input_file + ' -id ' + idxml_path + ' '
+    command += '-spectra:in ' + input_port+'/'+input_port+'-'+file_count+".mzML"
+
+    output = out_port+'/'+out_port+'-'+file_count+'.featureXML'
+    command += ' -out ' + output + ' >> ' + out_port+'/logfile.txt'
+
+    print("COMMAND: " + command + '\n')
+    return command
+
 
 '''
 #2 module: id mapper
 '''
 def idmapper(input_port, ini_file, idxml_path, featurefinder_port, out_port):
-    print("\n==ID MAPPER==")
-    for file in os.listdir(featurefinder_port):
-        if 'log' not in file:
-            filename = os.path.splitext(file)[0].split('-')[1]
-        else:
-            continue
+    assert len(list(parse_folder(featurefinder_port))) > 0, \
+      "ERROR: issue with featurefindermetabo step"
 
-        input = featurefinder_port + '/' + file
-        # input = featurefindermetabo_port + '/featurefinder-' + filename + '.featureXML'
-        output = out_port + '/idmapper-' + filename + '.featureXML'
-        # output = curr_port + '/out-' + filename + '.featureXML'
+    commands = []
+    for input_file,file_count in list(parse_folder(featurefinder_port)):
+        cmd = get_exec_cmd(input_file,file_count,ini_file,idxml_path,\
+          input_port,out_port)
+        commands.append(cmd)
 
-        command = 'IDMapper -ini ' + ini_file + ' -in ' + input + ' -id ' + idxml_path + ' -spectra:in '
-        command += input_port+'/'+os.listdir(input_port)[int(filename)] + ' '
-        # command += input_port+'/'+file + ' '
-        command += '-out ' + output + ' >> ' + out_port+'/logfile.txt'
+    processes = [Popen(cmd, shell=True) for cmd in commands]
 
-        print("COMMAND: " + command + '\n')
-        os.system(command)
-
+    for p in processes: p.wait()
 
 
 if __name__ == '__main__':
+    print("===ID Mapper===")
+
     # set env
-    if os.environ.has_key("LD_LIBRARY_PATH"):
-        os.environ["SANS_LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
-    os.environ["LD_LIBRARY_PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/lib"
-
-    if os.environ.has_key("PATH"):
-        os.environ["SANS_PATH"] = os.environ["PATH"]
-    os.environ["PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:$PATH"
-
-    openms_data_path = '/data/beta-proteomics2/tools/openms_2.4/openms-env/share'
-    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(openms_data_path)
-
-    curr_dir = os.listdir('.')
-    print(curr_dir)
-    for dir in curr_dir:
-        print(dir+":")
-        print(os.listdir(dir))
+    os.environ["LD_LIBRARY_PATH"] = sys.argv[1]
+    os.environ["PATH"] = sys.argv[2]
+    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(sys.argv[3])
 
     # ini file
-    ini_file = 'iniFiles/'+os.listdir('iniFiles')[0]
-    # shutil.copyfile(ini_file, sys.argv[2])
+    ini_file = None
+    if os.path.exists('iniFiles'):
+        ini_dir = list(parse_folder('iniFiles'))
+        if len(ini_dir) > 0:
+            ini_file = ini_dir[0][0]
 
-    idmapper(sys.argv[1], ini_file, "/data/beta-proteomics2/tools/openms/empty.idXML", sys.argv[4], sys.argv[5])
+    idmapper(sys.argv[4], ini_file, sys.argv[6], sys.argv[7], sys.argv[8])
     # idmapper(sys.argv[1], ini_file, sys.argv[3], sys.argv[4], sys.argv[5])

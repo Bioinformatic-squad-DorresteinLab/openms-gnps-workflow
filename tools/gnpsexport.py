@@ -3,22 +3,42 @@ import shutil
 import sys
 import xmltodict as xtd
 
+def parse_folder(dir):
+    if not os.path.exists(dir):
+        yield None
+    for file in sorted(os.listdir(dir)):
+        if "log" not in file:
+            yield (dir+"/"+file, os.path.splitext(file)[0].split('-')[1])
+
+
 '''
 #6 module: gnps export
 '''
-def gnpsexport(featurelinker_port, inputFiles_port, ini_file, output_type, out_port):
-    in_cm = featurelinker_port+'/'+"featurelinker.consensusXML"
+def gnpsexport(input_port, inputFiles_port, ini_file, out_port):
+    assert len(list(parse_folder(input_port))) > 0
 
-    # in_cm = in_port+'/'+get_port_outputs(in_port)[0]
-    output = out_port + '/' + "gnpsexport.mgf"
+    for input_file,file_count in list(parse_folder(input_port)):
+        output = out_port+'/'+out_port+"-"+file_count+".mgf"
 
-    command = "GNPSExport -ini " + ini_file + " -in_cm " + in_cm + " -in_mzml "
-    for file in os.listdir(inputFiles_port):
-        command += inputFiles_port+'/'+file + " "
-    command += "-out " + output + " -output_type " + output_type + ' >> ' + out_port+'/logfile.txt'
+        command = "GNPSExport "
+        if ini_file is not None:
+            command += "-ini " + ini_file + " "
+        command += "-in_cm " + input_file + " -in_mzml "
+        # command = "GNPSExport -ini " + ini_file + " -in_cm " + input_file + " -in_mzml "
 
-    print("COMMAND: " + command + "\n")
-    os.system(command)
+        file_maps = dict()
+        with open(input_file, 'r') as fp:
+            params = xtd.parse(fp.read())
+            for map in params['consensusXML']['mapList']['map']:
+                # print (map['@id'], map['@name'])
+                file_maps[int(map['@id'])] = map['@name']
+
+        for input_file,file_count in sorted(list(parse_folder(inputFiles_port))):
+            command += input_file + " "
+        command += "-out " + output + ' >> ' + out_port+'/logfile.txt'
+
+        print("COMMAND: " + command + "\n")
+        os.system(command)
 
 
 
@@ -26,35 +46,17 @@ if __name__ == '__main__':
     print("===GNPS EXPORT===")
 
     # set env
-    if os.environ.has_key("LD_LIBRARY_PATH"):
-        os.environ["SANS_LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
-    os.environ["LD_LIBRARY_PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/lib"
-
-    if os.environ.has_key("PATH"):
-        os.environ["SANS_PATH"] = os.environ["PATH"]
-    os.environ["PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:$PATH"
-
-    openms_data_path = '/data/beta-proteomics2/tools/openms_2.4/openms-env/share'
-    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(openms_data_path)
-
-    # output type
-    output_type = 'merged_spectra'
-    with open(sys.argv[4], 'r') as fp:
-        params = xtd.parse(fp.read())
-        for param in params['parameters']['parameter']:
-            if param['@name'] == "output_type":
-                output_type = param['#text']
-
-
-    curr_dir = os.listdir('.')
-    print(curr_dir)
-    for dir in curr_dir:
-        print(dir+":")
-        print(os.listdir(dir))
+    os.environ["LD_LIBRARY_PATH"] = sys.argv[1]
+    os.environ["PATH"] = sys.argv[2]
+    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(sys.argv[3])
 
 
     # ini file
-    ini_file = 'iniFiles/'+os.listdir('iniFiles')[0]
+    ini_file = None
+    if os.path.exists('iniFiles'):
+        ini_dir = list(parse_folder('iniFiles'))
+        if len(ini_dir) > 0:
+            ini_file = ini_dir[0][0]
     # shutil.copyfile(ini_file, sys.argv[3])
 
-    gnpsexport(sys.argv[1], sys.argv[2], ini_file, output_type, sys.argv[5])
+    gnpsexport(sys.argv[4], sys.argv[5], ini_file, sys.argv[7])

@@ -81,9 +81,10 @@ public:
   TOPPBase("GNPSExport", "Tool to export consensus features into MGF format", false) {}
 
 private:
-  double DEF_COSINE_SIMILARITY = 0.95;
-  double DEF_PRECURSOR_MZ_TOLERANCE = 0.0001;
-  double DEF_PRECURSOR_RT_TOLERANCE = 5;
+  double DEF_COSINE_SIMILARITY = 0.8;
+  double DEF_MERGE_BIN_SIZE = BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES;
+  // double DEF_PRECURSOR_MZ_TOLERANCE = 0.0001;
+  // double DEF_PRECURSOR_RT_TOLERANCE = 5;
 
 protected:
   // this function will be used to register the tool parameters
@@ -100,13 +101,14 @@ protected:
     setValidFormats_("out", ListUtils::create<String>("mgf"));
 
     registerStringOption_("output_type", "<choice>", "full_spectra", "specificity of mgf output information", false);
-    setValidStrings_("output_type", ListUtils::create<String>("full_spectra,merged_spectra"));
+    setValidStrings_("output_type", ListUtils::create<String>("full_spectra,merged_spectra,most_intense"));
 
-    registerDoubleOption_("precursor_mz_tolerance", "<num>", DEF_PRECURSOR_MZ_TOLERANCE, "Tolerance mz window for precursor selection", false);
-    registerDoubleOption_("precursor_rt_tolerance", "<num>", DEF_PRECURSOR_RT_TOLERANCE, "Tolerance rt window for precursor selection", false);
+    // registerDoubleOption_("precursor_mz_tolerance", "<num>", DEF_PRECURSOR_MZ_TOLERANCE, "Tolerance mz window for precursor selection", false);
+    // registerDoubleOption_("precursor_rt_tolerance", "<num>", DEF_PRECURSOR_RT_TOLERANCE, "Tolerance rt window for precursor selection", false);
 
     registerTOPPSubsection_("merged_spectra", "Options for exporting mgf file with merged spectra per feature");
     registerDoubleOption_("merged_spectra:cos_similarity", "<num>", DEF_COSINE_SIMILARITY, "Cosine similarity threshold for merged_spectra output", false);
+    registerDoubleOption_("merged_spectra:ms2_bin_size", "<num>", DEF_MERGE_BIN_SIZE, "Bin size (Da) when merging ms2 scans", false);
   }
 
   // the main function is called after all parameters are read
@@ -125,10 +127,10 @@ protected:
 
     String output_type(getStringOption_("output_type"));
 
-    double prec_mz_tol(getDoubleOption_("precursor_mz_tolerance"));
-    double prec_rt_tol(getDoubleOption_("precursor_rt_tolerance"));
+    // double prec_mz_tol(getDoubleOption_("precursor_mz_tolerance"));
+    // double prec_rt_tol(getDoubleOption_("precursor_rt_tolerance"));
 
-    double cos_sim(getDoubleOption_("merged_spectra:cos_similarity"));
+    double cos_sim_threshold(getDoubleOption_("merged_spectra:cos_similarity"));
 
     //-------------------------------------------------------------
     // reading input
@@ -182,12 +184,14 @@ protected:
       // print spectra information (PeptideIdentification tags)
       vector<PeptideIdentification> peptide_identifications = feature.getPeptideIdentifications();
 
+      cout << "\nfor feature " << i << " e_" << feature.getUniqueId() << endl;
 
       // clean peptide identifications outside mz rt tol ranges
 
       // vector of <<map index, spectrum index>, most intense ms2 scan>
       vector<pair<pair<double,PeptideIdentification>,pair<int,int>>> peptides;
 
+      // determine if current feature has peptide annotations
       bool should_skip_feature;
       if (!(should_skip_feature = peptide_identifications.empty()))
       {
@@ -209,7 +213,7 @@ protected:
           if (map_index != -1 && spectrum_index != -1)
           {
             // TEMP: log debug map index and spectrum index values once they are found
-            LOG_DEBUG << "map index\t" << map_index << "\tspectrum index\t" << spectrum_index << endl;
+            cout << "\tmap index\t" << map_index << "\tspectrum index\t" << spectrum_index << endl;
 
             // retrieve spectrum for current peptide annotation
             auto ms2_scan = ms_maps[map_index][spectrum_index];
@@ -217,39 +221,44 @@ protected:
 
             if (ms2_scan.getMSLevel() == 2 && !ms2_scan.empty())
             {
-              should_skip_feature = false;
-
-              if (abs(feature.getMZ() - peptide_identification.getMZ()) > prec_mz_tol
-              && abs(feature.getRT() - peptide_identification.getRT()) > prec_rt_tol)
+              double similarity_index = 0;
+              // double similarity_index = abs(feature.getMZ() - peptide_identification.getMZ()) + abs(feature.getRT() - peptide_identification.getRT());
+              for(auto ms2_iter = ms2_scan.begin(); ms2_iter != ms2_scan.end(); ms2_iter++)
               {
-                continue;
+                similarity_index += ms2_iter->getIntensity();
               }
-
-              double similarity_index = 5 * abs(feature.getMZ() - peptide_identification.getMZ()) +
-              abs(feature.getRT() - peptide_identification.getRT());
-
-              pair<double,PeptideIdentification> first_pair = pair<double,PeptideIdentification>(similarity_index, peptide_identification);
-              pair<int,int> second_pair = pair<int,int>(map_index, spectrum_index);
+              auto first_pair = pair<double,PeptideIdentification>(similarity_index, peptide_identification);
+              auto second_pair = pair<int,int>(map_index, spectrum_index);
 
               peptides.push_back(pair<pair<double,PeptideIdentification>,pair<int,int>>(first_pair,second_pair));
             }
-          }
-          else
-          {
-            should_skip_feature = true;
+            // for debug purposes
+            else
+            {
+              // should_skip_feature = true;
+
+              if (ms2_scan.empty())
+              {
+                cout << "\t\t-ms2 scan is empty\t" << peptide_identification.getMetaValue("spectrum_reference") << endl;
+              }
+            }
           }
         }
       }
+      else
+      {
+        cout << "empty peptide identification list" << endl;
+      }
 
       // peptides list of < <similarity_index, PeptideIdentification>, <map_index, feature_index> >
-
       // with the remaining peptides left within mz/rt tol of most intense
       if (!should_skip_feature && !peptides.empty())
       {
-        // prepare peptides for output with highest mz value at top
-        sort (peptides.begin(), peptides.end(), [](const pair<pair<double,PeptideIdentification>,pair<int,int>> &a, const pair<pair<double,PeptideIdentification>,pair<int,int>> &b)
+        // prepare peptides for output with smallest difference in mz
+        sort (peptides.begin(), peptides.end(), [](const pair<pair<double,PeptideIdentification>,pair<int,int>> &a,
+          const pair<pair<double,PeptideIdentification>,pair<int,int>> &b)
         {
-          return a.first.first < b.first.first;
+          return a.first.first > b.first.first;
         });
 
         // tmp stream for current feature
@@ -263,26 +272,25 @@ protected:
           {
             feature_stream << "BEGIN IONS" << endl;
 
-            feature_stream << "FEATURE_ID=" << to_string(feature_count) << endl;
+            feature_stream << "SCANS=" << to_string(feature_count) << endl;
 
             string filename = mzml_file_paths[peptide.second.first];
             Size parse_index = filename.rfind("/") + 1;
             filename = filename.substr(parse_index);
-            feature_stream << "CONSENSUS_ID=e_" << feature.getUniqueId() << endl;
+            feature_stream << "FEATURE_ID=e_" << feature.getUniqueId() << endl;
 
             feature_stream << "MSLEVEL=2" << endl;
             feature_stream << "CHARGE=" << to_string(charge == 0 ? 1 : charge) << "+" << endl;
             feature_stream << "PEPMASS=" << feature.getMZ() << endl;
             feature_stream << "FILE_INDEX=" << peptide.second.second << endl;
-            feature_stream << "RTINSECOND=" << peptide.first.second.getRT() << endl;
+            feature_stream << "RTINSECONDS=" << peptide.first.second.getRT() << endl;
 
             auto ms2_scan = ms_maps[peptide.second.first][peptide.second.second];
             // sort spectra
             sort (ms2_scan.begin(), ms2_scan.end(), [](const Peak1D& a, const Peak1D& b)
             {
-              return a.getMZ() > b.getMZ();
+              return a.getMZ() < b.getMZ();
             });
-            // ms2_scan.sortByIntensity(true);
 
             for (Size l = 0; l < ms2_scan.size(); l++)
             {
@@ -293,69 +301,145 @@ protected:
           }
           feature_count++;
         }
-        else // merged spectra
+        // merged spectra
+        else if(output_type == "merged_spectra")
         {
           // map mz to intensity
-          map<double,int> ms2_block;
+          map<double,double> ms2_block;
 
-          // MSExperiment exp;
+          // // MapType exp;
 
-          // const BinnedSpectrum binned_highest_int(0.02, 1, ms_maps[peptides[0].second.first][peptides[0].second.second]);
           const BinnedSpectrum binned_highest_int(ms_maps[peptides[0].second.first][peptides[0].second.second], BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES, false, 1, BinnedSpectrum::DEFAULT_BIN_OFFSET_HIRES);
 
-          for (auto peptide : peptides)
+          // MERGE: merge all peptide annotation spectra (mz and intensity)
+          vector<pair<double,double>> mz_intensity_all;
+          Size peptide_count = 0;
+          for(auto peptide : peptides)
           {
-            int map_index = peptide.second.first;
-            int spectra_index = peptide.second.second;
-            // int highest_binned_intensity = peptide.first.first;
-            // auto highest_peptide_identification = peptide.first.second;
+              int map_index = peptide.second.first;
+              int spectra_index = peptide.second.second;
 
-            auto spectrum = ms_maps[map_index][spectra_index];
+              auto spectrum = ms_maps[map_index][spectra_index];
+              const BinnedSpectrum binned_spectrum(spectrum, BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES, false, 1, BinnedSpectrum::DEFAULT_BIN_OFFSET_HIRES);
 
-            // const BinnedSpectrum binned_spectrum(.02, 1, spectrum);
-            const BinnedSpectrum binned_spectrum(spectrum, BinnedSpectrum::DEFAULT_BIN_WIDTH_HIRES, false, 1, BinnedSpectrum::DEFAULT_BIN_OFFSET_HIRES);
-
-            BinnedSpectralContrastAngle bsca;
-            double cosine_sim = bsca(binned_highest_int, binned_spectrum);
-            // LOG_DEBUG << cosine_sim << " >= " << cos_sim << endl;
-
-            // compare calculated cosine sim to binned highest int
-            if (cosine_sim >= cos_sim)
-            {
-              for (Size spectrum_index = 0; spectrum_index < spectrum.size(); ++spectrum_index)
+              BinnedSpectralContrastAngle bsca;
+              double cosine_sim = bsca(binned_highest_int, binned_spectrum);
+              cout << "\tsimilarity of peptide " << peptide_count++ << " = " << cosine_sim << endl;
+              if(cosine_sim < cos_sim_threshold)
               {
-                // exp.addSpectrum(spectrum);
-                // exp.addSpectrum(spectrum);
-                auto curr_spectrum = spectrum[spectrum_index];
-                if (ms2_block[curr_spectrum.getMZ()] < curr_spectrum.getIntensity())
-                {
-                  ms2_block[curr_spectrum.getMZ()] = curr_spectrum.getIntensity();
-                }
+                cout << "\t" << "merged out\t" << map_index << "\t" << spectra_index << endl;
+                break;
               }
+
+              for(auto spectrum_iter = spectrum.begin(); spectrum_iter != spectrum.end(); spectrum_iter++)
+              {
+                mz_intensity_all.push_back(pair<double,double>(spectrum_iter->getMZ(), spectrum_iter->getIntensity()));
+              }
+          }
+          sort(mz_intensity_all.begin(), mz_intensity_all.end(),[](pair<double,double>a, pair<double,double>b)
+          {
+            return a.first > b.first;
+          });
+
+          // generate new spectrum
+          vector<double> mz_merged;
+          vector<double> intensity_merged;
+          double last_mz = numeric_limits<double>::min();
+          double delta_mz(getDoubleOption_("merged_spectra:ms2_bin_size"));
+          double sum_mz = 0;
+          double sum_intensity = 0;
+          Size count(0);
+          for(auto it_mz = mz_intensity_all.begin(); it_mz != mz_intensity_all.end(); it_mz++)
+          {
+            if(abs(it_mz->first-last_mz)>delta_mz && count>0)
+            {
+              mz_merged.push_back(sum_mz/count);
+              intensity_merged.push_back(sum_intensity);
+
+              sum_mz = 0;
+              sum_intensity = 0;
+              last_mz = it_mz->first;
+              count = 0;
             }
+            sum_mz += it_mz -> first;
+            sum_intensity += it_mz->second;
+            count++;
+          }
+          if(count > 0)
+          {
+            mz_merged.push_back(sum_mz/count);
+            intensity_merged.push_back(sum_intensity);
           }
 
+          if(mz_merged.size() < mz_intensity_all.size())
+            cout << "\tmz_merged.size() = " << mz_merged.size() << endl;
 
+          // zip mz and intensity
+
+          for(Size ms2_block_index = 0; ms2_block_index < mz_merged.size(); ms2_block_index++)
+          {
+            ms2_block[mz_merged[ms2_block_index]] = intensity_merged[ms2_block_index];
+          }
+
+          // print
           feature_stream << "BEGIN IONS" << endl;
 
-          feature_stream << "FEATURE_ID=" << feature_count++ << endl;
-          feature_stream << "CONSENSUS_ID=e_" << feature.getUniqueId() << endl;
+          feature_stream << "SCANS=" << feature_count++ << endl;
+          feature_stream << "FEATURE_ID=e_" << feature.getUniqueId() << endl;
 
           feature_stream << "MSLEVEL=2" << endl;
           feature_stream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
           feature_stream << "PEPMASS=" << feature.getMZ() << endl;
           feature_stream << "FILE_INDEX=" << peptides[0].second.second << endl;
-          feature_stream << "RTINSECOND=" << peptides[0].first.second.getRT() << endl;
+          feature_stream << "RTINSECONDS=" << peptides[0].first.second.getRT() << endl;
 
-          for (auto ms2_iter = ms2_block.rbegin(); ms2_iter != ms2_block.rend(); ++ms2_iter)
+          for (auto ms2_iter = ms2_block.begin(); ms2_iter != ms2_block.end(); ++ms2_iter)
           {
             feature_stream << ms2_iter->first << "\t" << (int) ms2_iter->second << endl;
+          }
+          feature_stream << "END IONS" << endl << endl;
+        }
+        // most intense ms2 block
+        else if(output_type == "most_intense")
+        {
+          // print
+          feature_stream << "BEGIN IONS" << endl;
+
+          feature_stream << "SCANS=" << feature_count++ << endl;
+          feature_stream << "FEATURE_ID=e_" << feature.getUniqueId() << endl;
+
+          feature_stream << "MSLEVEL=2" << endl;
+          feature_stream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+          feature_stream << "PEPMASS=" << feature.getMZ() << endl;
+          feature_stream << "FILE_INDEX=" << peptides[0].second.second << endl;
+          feature_stream << "RTINSECONDS=" << peptides[0].first.second.getRT() << endl;
+
+          auto ms2_scan = ms_maps[peptides[0].second.first][peptides[0].second.second];
+          for (auto ms2_iter = ms2_scan.begin(); ms2_iter != ms2_scan.end(); ++ms2_iter)
+          {
+            feature_stream << ms2_iter->getMZ() << "\t" << (int) ms2_iter->getIntensity() << endl;
           }
           feature_stream << "END IONS" << endl << endl;
         }
 
         // output feature information to general outputStream
         output_stream << feature_stream.str() << endl;
+      }
+      // should skip printing feature ms2 spectra block
+      else
+      {
+        cout << "here" << endl;
+        // print empty block
+        output_stream << "BEGIN IONS" << endl;
+
+        output_stream << "SCANS=" << feature_count++ << endl;
+        output_stream << "FEATURE_ID=e_" << feature.getUniqueId() << endl;
+        output_stream << "MSLEVEL=2" << endl;
+        output_stream << "CHARGE=" << std::to_string(charge == 0 ? 1 : charge) << "+" << endl;
+        output_stream << "PEPMASS=" << feature.getMZ() << endl;
+        output_stream << "RTINSECONDS=" << feature.getRT() << endl;
+
+        output_stream << "END IONS" << endl << endl << endl;
       }
     }
     progress_logger.endProgress();

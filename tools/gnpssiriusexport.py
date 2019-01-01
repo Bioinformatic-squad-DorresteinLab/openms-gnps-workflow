@@ -41,10 +41,10 @@ if __name__ == '__main__':
 
     # output type
     output_type = 'merged_spectra'
-    with open(sys.argv[4], 'r') as fp:
+    with open(sys.argv[3], 'r') as fp:
         params = xtd.parse(fp.read())
         for param in params['parameters']['parameter']:
-            if param['@name'] == "output_type":
+            if param['@name'] == "gnpsexport.output_type":
                 output_type = param['#text']
 
 

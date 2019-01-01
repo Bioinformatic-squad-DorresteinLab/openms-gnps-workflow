@@ -10,6 +10,19 @@
     <blockRef id="result_output" type="download_result_output"/>
   </view>
 
+  <view id="makedatasetlink" label="Analyze with Feature Based Molecular Networking at GNPS" group="Follow Up Analysis">
+    <blockRef id="main"   type="makedatasetlink"/>
+  </view>
+  <block id="makedatasetlink" type="dummylinkout">
+    <data>
+      <parsers>
+        <parser type="stream" contentType="text/xml"/>
+      </parsers>
+    </data>
+    <parameter name="URLBASE" value="https://gnps.ucsd.edu/ProteoSAFe/index.jsp"/>
+    <parameter name="REQUESTPARAMETER=params" value='%7B"workflow":"FEATURE-BASED-MOLECULAR-NETWORKING","spec_on_server":"f.[task]/output/gnpsexport/gnpsexport-0000.mgf;","quantification_table":"f.[task]/output/textexporter/textexporter-0000.csv;","QUANT_TABLE_SOURCE":"OPENMS"%7D'/>
+  </block>
+
 
   <block id="download_ms2_result" type="dummydownload">
     <data>

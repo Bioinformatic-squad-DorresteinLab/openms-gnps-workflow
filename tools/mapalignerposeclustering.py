@@ -2,22 +2,29 @@ import os
 import shutil
 import sys
 
+def parse_folder(dir):
+    if not os.path.exists(dir):
+        yield None
+    for file in sorted(os.listdir(dir)):
+        if "log" not in file:
+            yield (dir+"/"+file, os.path.splitext(file)[0].split('-')[1])
+
+
 '''
 #3 module: map aligner pose clustering
 '''
-def mapalignerposeclustering(idmapper_port, ini_file, out_port):
-    command = "MapAlignerPoseClustering -ini " + ini_file + " -in "
-    output = ""
-
-    for file in os.listdir(idmapper_port):
-        if 'log' not in file:
-            command += idmapper_port+'/'+file + ' '
+def mapalignerposeclustering(input_port, ini_file, out_port):
+    assert len(list(parse_folder(input_port))) > 0
+    command = "MapAlignerPoseClustering "
+    if ini_file is not None:
+        command += "-ini " + ini_file + " "
+    command += "-in "
+    for input_file,file_count in list(parse_folder(input_port)):
+        command += input_file + ' '
 
     command += '-out '
-    for file in os.listdir(idmapper_port):
-        if 'log' not in file:
-            filename = os.path.splitext(file)[0].split('-')[1]
-            command += out_port+"/mapaligner-"+filename+".featureXML "
+    for input_file,file_count in list(parse_folder(input_port)):
+        command += out_port+"/"+out_port+"-"+file_count+".featureXML" + ' '
     command += ' >> ' + out_port+'/logfile.txt'
 
     print("COMMAND: " + command + "\n")
@@ -28,26 +35,16 @@ if __name__ == '__main__':
     print("===MAP ALIGNER POSE CLUSTERING===")
 
     # set env
-    if os.environ.has_key("LD_LIBRARY_PATH"):
-        os.environ["SANS_LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
-    os.environ["LD_LIBRARY_PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/lib"
-
-    if os.environ.has_key("PATH"):
-        os.environ["SANS_PATH"] = os.environ["PATH"]
-    os.environ["PATH"] = "/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:$PATH"
-
-    openms_data_path = '/data/beta-proteomics2/tools/openms_2.4/openms-env/share'
-    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(openms_data_path)
-
-    curr_dir = os.listdir('.')
-    print(curr_dir)
-    for dir in curr_dir:
-        print(dir+":")
-        print(os.listdir(dir))
+    os.environ["LD_LIBRARY_PATH"] = sys.argv[1]
+    os.environ["PATH"] = sys.argv[2]
+    os.environ["OPENMS_DATA_PATH"] = os.path.abspath(sys.argv[3])
 
     # ini file
-    ini_file = 'iniFiles/'+os.listdir('iniFiles')[0]
-    # shutil.copyfile(ini_file, sys.argv[2])
+    ini_file = None
+    if os.path.exists('iniFiles'):
+        ini_dir = list(parse_folder('iniFiles'))
+        if len(ini_dir) > 0:
+            ini_file = ini_dir[0][0]
 
-    mapalignerposeclustering(sys.argv[1], ini_file, sys.argv[3])
+    mapalignerposeclustering(sys.argv[4], ini_file, sys.argv[6])
     # mapalignerposeclustering(sys.argv[1], sys.argv[2], sys.argv[3])
