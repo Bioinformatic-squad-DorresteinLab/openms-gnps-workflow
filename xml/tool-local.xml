@@ -19,7 +19,7 @@
 
     <pathVar name="feature-finder-metabo.script"        path="featurefindermetabo.py"/>
     <pathVar name="id-mapper.script"                    path="idmapper.py"/>
-    <pathVar name="idmapper_empty"                      path="/data/beta-proteomics2/tools/openms/empty.idXML"/>
+    <pathVar name="idmapper_empty"                      path="/data/beta-proteomics2/tools/openms_2.4/empty.idXML"/>
     <pathVar name="map-aligner-pose-clustering.script"  path="mapalignerposeclustering.py"/>
     <pathVar name="metabolite-adduct-decharger.script"  path="metaboliteadductdecharger.py"/>
     <pathVar name="feature-linker-unlabeled.script"     path="featurelinkerunlabeled.py"/>
