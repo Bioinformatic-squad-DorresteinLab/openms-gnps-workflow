@@ -1,21 +1,33 @@
 <toolset>
 
-	<pathSet base="openms_2.4">
+  <pathSet base="openms_2.4/openms-env/conda/bin">
+    <toolPath tool="feature-finder-metabo"    path="python"/>
+    <toolPath tool="id-mapper"    path="python"/>
+    <toolPath tool="map-aligner-pose-clustering"    path="python"/>
+    <toolPath tool="metabolite-adduct-decharger"    path="python"/>
+    <toolPath tool="feature-linker-unlabeled"    path="python"/>
+    <toolPath tool="file-filter"    path="python"/>
+    <toolPath tool="gnps-export"    path="python"/>
+    <toolPath tool="text-exporter"    path="python"/>
+    <toolPath tool="parse-output"    path="python"/>
+  </pathSet>
+
+  <pathSet base="openms_2.4">
     <pathVar name="ld_library_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/lib"/>
     <pathVar name="exc_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin:$PATH"/>
     <pathVar name="openms_data_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/share"/>
 
-		<toolPath tool="feature-finder-metabo" path="featurefindermetabo.py"/>
-		<toolPath tool="id-mapper" path="idmapper.py"/>
-    <pathVar  name="idmapper_empty" path="/data/beta-proteomics2/tools/openms/empty.idXML"/>
-    <toolPath tool="map-aligner-pose-clustering"  path="mapalignerposeclustering.py"/>
-    <toolPath tool="metabolite-adduct-decharger"  path="metaboliteadductdecharger.py"/>
-    <toolPath tool="feature-linker-unlabeled"  path="featurelinkerunlabeled.py"/>
-    <toolPath tool="file-filter"                  path="filefilter.py"/>
-    <toolPath tool="gnps-export"                  path="gnpsexport.py"/>
-    <toolPath tool="text-exporter"                  path="textexporter.py"/>
-    <toolPath tool="parse-output"                  path="parse_output.py"/>
-	</pathSet>
+    <pathVar name="feature-finder-metabo.script"        path="featurefindermetabo.py"/>
+    <pathVar name="id-mapper.script"                    path="idmapper.py"/>
+    <pathVar name="idmapper_empty"                      path="/data/beta-proteomics2/tools/openms/empty.idXML"/>
+    <pathVar name="map-aligner-pose-clustering.script"  path="mapalignerposeclustering.py"/>
+    <pathVar name="metabolite-adduct-decharger.script"  path="metaboliteadductdecharger.py"/>
+    <pathVar name="feature-linker-unlabeled.script"     path="featurelinkerunlabeled.py"/>
+    <pathVar name="file-filter.script"                  path="filefilter.py"/>
+    <pathVar name="gnps-export.script"                  path="gnpsexport.py"/>
+    <pathVar name="text-exporter.script"                path="textexporter.py"/>
+    <pathVar name="parse-output.script"                 path="parse_output.py"/>
+  </pathSet>
 
   <tool name="feature-finder-metabo">
     <require name="inputFiles"  type="folder"/>
@@ -23,7 +35,8 @@
 
     <produce name="featurefindermetabo" type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="feature-finder-metabo.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -40,7 +53,8 @@
     <require name="featurefindermetabo" type="folder"/>
     <produce name="idmapper"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="id-mapper.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -59,7 +73,8 @@
     <require name="iniFiles-mapaligner" type="file"/>
     <produce name="mapalignerposeclustering"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="map-aligner-pose-clustering.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -76,7 +91,8 @@
     <require name="iniFiles-adductdecharger" type="file"/>
     <produce name="metaboliteadductdecharger"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="metabolite-adduct-decharger.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -94,7 +110,8 @@
     <require name="flowParams" type="file"/>
     <produce name="featurelinkerunlabeled"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="feature-linker-unlabeled.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -111,7 +128,8 @@
     <require name="featurelinkerunlabeled"  type="folder"/>
     <produce name="filefilter"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="file-filter.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -129,7 +147,8 @@
     <!-- <require name="flowParams" type="file"/> -->
     <produce name="gnpsexport"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="gnps-export.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -149,7 +168,8 @@
     <require name="flowParams" type="file"/>
     <produce name="textexporter"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg pathRef="text-exporter.script"/>
       <arg pathRef="ld_library_path"/>
       <arg pathRef="exc_path"/>
       <arg pathRef="openms_data_path"/>
@@ -173,7 +193,8 @@
 
     <produce name="output"  type="folder"/>
 
-    <execution env="python" argConvention="binary">
+    <execution env="binary" argConvention="adhoc">
+      <arg valueRef="parse-output.script"/>
       <arg valueRef="featurefindermetabo"/>
       <arg valueRef="idmapper"/>
       <arg valueRef="mapalignerposeclustering"/>
