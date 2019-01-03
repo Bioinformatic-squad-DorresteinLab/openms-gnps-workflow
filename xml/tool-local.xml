@@ -14,7 +14,7 @@
 
   <pathSet base="openms_2.4">
     <pathVar name="ld_library_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/lib"/>
-    <pathVar name="exc_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin:$PATH"/>
+    <pathVar name="exc_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/openms-build/bin:/data/beta-proteomics2/tools/openms_2.4/openms-env/conda/bin"/>
     <pathVar name="openms_data_path" path="/data/beta-proteomics2/tools/openms_2.4/openms-env/share"/>
 
     <pathVar name="feature-finder-metabo.script"        path="featurefindermetabo.py"/>
@@ -195,7 +195,7 @@
 
     <execution env="binary" argConvention="adhoc">
       <arg pathRef="parse-output.script"/>
-      
+
       <arg valueRef="featurefindermetabo"/>
       <arg valueRef="idmapper"/>
       <arg valueRef="mapalignerposeclustering"/>
