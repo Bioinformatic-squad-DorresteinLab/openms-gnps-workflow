@@ -7,9 +7,6 @@
 
   <view id="download_openms" label="Download OpenMS Output Files" group="DOWNLOADS">
     <blockRef id="openms_output" type="download_openms_output"/>
-    <!-- <download>
-      <source type="folder" name="output/"/>
-    </download> -->
   </view>
 
   <view id="download_workflow" label="Download Workflow Files" group="DOWNLOADS">
@@ -25,16 +22,14 @@
 
   <block id="download_openms_output" type="dummydownload">
     <data>
-      <source type="folder" name="output/filefilter/"/>
-      <parsers>
-        <parser type="stream" contentType="text/xml"/>
-      </parsers>
+      <!-- TODO: fix directory maps -->
+      <source type="folder" name="output/invalid_dir/"/>
     </data>
   </block>
 
   <block id="download_workflow_files" type="dummydownload">
     <data>
-      <source type="file" name="output/download_all_files/"/>
+      <source type="file" name="output/workflow_files/"/>
       <parsers>
         <parser type="stream" contentType="text/xml"/>
       </parsers>
